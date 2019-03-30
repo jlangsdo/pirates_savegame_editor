@@ -9,6 +9,7 @@
 #include <iostream>
 #include <sstream>
 #include <getopt.h>
+#include <regex>
 #include "Pirates.hpp"
 using namespace std;
 
@@ -73,8 +74,9 @@ int main(int argc, char **argv)
         string file_to_unpack;
         std::istringstream tokenStream(unpack);
         while(std::getline(tokenStream, file_to_unpack, ',')) {
-            string full_file = find_file(save_dir, file_to_unpack, pg);
-            cout << "Unpacking " << full_file << "\n";
+            string pg_file = find_file(save_dir, file_to_unpack, pg);
+            string pst_file = regex_replace(pg_file, regex("\\." + pg + "$"), "." + pst);
+            unpack_pg_to_pst(pg_file, pst_file);
         }
     }
     if (pack.size()) {

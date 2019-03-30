@@ -39,3 +39,22 @@ string find_file(string dir, string file, string suffix) {
     exit(1);
 }
 
+void unpack_pg_to_pst(string pg_file, string pst_file) {
+    ifstream pg_in = ifstream(pg_file);
+    if (! pg_in.is_open()) {
+        cerr << "Failed to read from " << pg_file << "\n";
+        exit(1);
+    }
+    cout << "Unpacking " << pg_file << "\n";
+    
+    ofstream pst_out = ofstream(pst_file);
+    if (! pst_out.is_open()) {
+        cerr << "Failed to write to " << pst_file << "\n";
+        pg_in.close();
+        exit(1);
+    }
+    cout << "Writing " << pst_file << "\n\n";
+    
+    pg_in.close();
+    pst_out.close();
+}
