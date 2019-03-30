@@ -7,22 +7,26 @@
 //
 
 #include <iostream>
+#include <sstream>
 #include <getopt.h>
+#include "Pirates.hpp"
 using namespace std;
 
 const string usage = R"USAGE(
 
 Basic switches:
--unpack <>      pirates_savegame -> pst
--pack <>        pst -> pirates_savegame
+-dir <>         Directory to find pirates_savegame files
+-unpack <>      pirates_savegame file(s) to be unpacked to a pst
+-pack <>        pst file(s) to pack into pirates_savegame
 -advanced_help  More information, including splicing switches
 
 The pst file is a text file which contains all of the information
 required to rewrite the original pirates savegame.
 
-After running unpack on a pirates_savegame file,
+After running -unpack on a pirates_savegame file,
 you can edit the pst file in any text editor,
 then run -pack to rebuild the pirates_savegame file.
+Leave off the file extension.
 
 The advanced switches give you ways to splice parts of one
 pst file into another without a text editor.
@@ -42,21 +46,38 @@ int main(int argc, char **argv)
     const static struct option long_options[] =
     {
         {"advanced_help", no_argument, 0, 'a'},
+        {"dir",     required_argument, 0, 'd'},
         {"help",          no_argument, 0, 'h'},
         {"pack",    required_argument, 0, 'p'},
         {"unpack",  required_argument, 0, 'u'},
     };
+    
+    string unpack;
+    string pack;
+    string save_dir = "/usr";
+    
     while (1) {
         int option_index = 0;
         c = getopt_long_only (argc, argv, "", long_options, &option_index);
         if (c == -1) break;
         switch (c) {
             case 'a':  cout << script_name << ausage; return 0;
+            case 'd': save_dir = optarg; break;
             case 'h':  cout << script_name << usage; return 0;
-            case 'p' : cout << "Packing " << optarg << "\n"; break;
-            case 'u' : cout << "Unpacking " << optarg << "\n"; break;
+            case 'p': pack = optarg; break;
+            case 'u': unpack = optarg; break;
             default: abort();
         }
     }
-
+    if (unpack.size()) {
+        string file_to_unpack;
+        std::istringstream tokenStream(unpack);
+        while(std::getline(tokenStream, file_to_unpack, ',')) {
+            string full_file = find_file(save_dir, file_to_unpack, pg);
+            cout << "Unpacking " << full_file << "\n";
+        }
+    }
+    if (pack.size()) {
+        cout << "Packing " << pack << "\n";
+    }
 }
