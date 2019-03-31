@@ -27,13 +27,27 @@ const map<translation_type,char> char_for_method = {
     {TEXT,'t'}, {INT, 'V'}, {HEX, 'h'}, {BINARY, 'B'}, {SHORT, 's'}, {CHAR, 'C'}
 };
 
-struct decoder_group {
-    int count;
-    translation_type method;
-    int size;
+const map<translation_type,char> count_for_method = {
+    {TEXT,0}, {INT,1}, {HEX,1}, {BINARY,4}, {SHORT,2}, {CHAR,4}
+};
+
+const map<translation_type,char> size_for_method = {
+    {TEXT,0}, {INT,4}, {HEX,4}, {BINARY,1}, {SHORT,2}, {CHAR,1}
+};
+
+struct decode_for_group {
+    translation_type method = INT;                    // How to decode them
+    int count = count_for_method.at(method);          // How many lines in this group (if not decoding 4 bytes)
+    int size = size_for_method.at(method);            // Some methods have different variants (text)
+};
+
+struct decode_for_line {
     string comment = "";
     string (*translate_fn)(string line) = nullptr;
+    bool has_alt_decode;
+    decode_for_group alt_decode ;
 };
+
 
 string translate_skill(string line) { return line; }
 
@@ -71,56 +85,63 @@ string load_city(string value) {
     return "";
 }
 
-map<string,decoder_group> decoder_groups = {
-    {"Intro",   {6, HEX, 4 }},
-    {"Intro_0", {1, TEXT, 0 }},
-    {"Intro_1", {1, INT, 4, "You are here x",}},
-    {"Intro_2", {1, INT, 4, "You are here y"}},
-    {"Intro_4", {1, INT, 4, "Difficulty", translate_difficulty }},
-    {"Intro_5", {1, INT, 4, "Last city visited"}}, // Update this to be more clear
-    {"Skill",   {1, INT, 4, "", translate_skill}},
-    {"CityName", {128, TEXT, 8, "", load_city}},
-    {"Personal",     {57, INT, 4}},
-    {"Personal_2",    {4,BINARY, 1}},
-    {"Personal_2_0",   {1, BINARY,1, "on land/marching perspective/0/0/0/not in battle or city/0/0"}},
-    {"Personal_5",    {2, SHORT, 2}},
-    {"Personal_5_0",   {1, SHORT, 2, "Spanish Attitude"}},
-    {"Personal_5_1",   {1, SHORT, 2, "English Attitude"}},
-    {"Personal_6",    {2, SHORT, 2}},
-    {"Personal_6_0",   {1, SHORT, 2, "French Attitude"}},
-    {"Personal_6_1",   {1, SHORT, 2, "Dutch Attitude"}},
-    {"Personal_9",    {2, SHORT, 2}},
-    {"Personal_9_0",   {1, SHORT, 2, "Spanish Rank", translate_rank}},
-    {"Personal_9_1",   {1, SHORT, 2, "English Rank", translate_rank}},
-    {"Personal_10",   {2, SHORT, 2}},
-    {"Personal_10_0",  {1, SHORT, 2, "French Rank", translate_rank}},
-    {"Personal_10_1",  {1, SHORT, 2, "Dutch Rank",  translate_rank}},
-    {"Personal_17",   {1, INT, 4, "Starting nation", translate_nation}},
-    {"Personal_18",   {4, BINARY, 1}},
-    {"Personal_18_0",  {1, BINARY, 1, "000000/have ever danced/1"}},
-    {"Personal_19",   {1, INT, 4, "Crew"}},
-    {"Personal_20",   {1, INT, 4, "Gold on hand"}},
-    {"Personal_21",   {1, INT, 4, "Food"}},
-    {"Personal_22",   {1, INT, 4, "Luxuries"}},
-    {"Personal_23",   {1, INT, 4, "Goods"}},
-    {"Personal_24",   {1, INT, 4, "Spice"}},
-    {"Personal_25",   {1, INT, 4, "Sugar"}},
-    {"Personal_26",   {1, INT, 4, "Cannon"}},
-    {"Personal_27",   {1, INT, 4, "Ship(s) in Fleet"}},
-    {"Personal_44",   {1, INT, 4, "Wealth in gold"}},
-    {"Personal_45",   {2, SHORT, 2}},
-    {"Personal_45_1",   {1, SHORT, 2, "months at sea"}},
-    {"Personal_46",   {2, SHORT, 2}},
-    {"Personal_46_0",   {1, SHORT, 2, "Relatives found"}},
-    {"Personal_46_1",   {1, SHORT, 2, "Lost cities found"}},
-    {"Personal_47",   {4, CHAR, 1}},
-    {"Personal_48",   {4, CHAR, 1}},  // NOTE augment_decoder_groups below.
-    {"Personal_49",   {4, CHAR, 1}},
-    {"Personal_50",   {4, CHAR, 1}},
-    {"Personal_51",   {4, CHAR, 1}},
-    {"Personal_52",   {4, BINARY,1}},
-    {"Personal_52_0",  {1, BINARY,1, "cook/quartermaster/navigator/surgeon/gunner/cooper/sailmaker/carpenter"}},
+
+
+map<string,decode_for_group> group_decode = {
+    {"Intro",        {HEX, 6}},
+    {"Skill",        {INT, 6}},
+    {"CityName",     {TEXT, 128, 8}},
+    {"Personal",     {INT, 57}},
+    
+    {"Personal_2",    {BINARY}},
+    {"Personal_5",    {SHORT}},
+    {"Personal_6",    {SHORT}},
+    {"Personal_9",    {SHORT}},
+    {"Personal_10",   {SHORT}},
+    {"Personal_18",   {BINARY}},
+    {"Personal_45",   {SHORT}},
+    {"Personal_46",   {SHORT}},
+    {"Personal_47",   {CHAR}},
+    {"Personal_48",   {CHAR}},
+    {"Personal_49",   {CHAR}},
+    {"Personal_50",   {CHAR}},
+    {"Personal_51",   {CHAR}},
+    {"Personal_52",   {BINARY}},
 };
+
+map<string,decode_for_line> line_decode = {
+    {"Intro_0", {"", nullptr, true, {TEXT,1,0}}},
+    {"Intro_1", {"You are here x", nullptr, true, {INT}}},
+    {"Intro_2", {"You are here y", nullptr, true, {INT}}},
+    {"Intro_4", {"Difficulty", translate_difficulty, true, {INT}}},
+    {"Intro_5", {"Last city visited", nullptr, true, {INT}}}, // Update this to be more clear
+    {"Personal_2_0",   {"on land/marching perspective/0/0/0/not in battle or city/0/0"}},
+    {"Personal_5_0",   {"Spanish Attitude"}},
+    {"Personal_5_1",   {"English Attitude"}},
+    {"Personal_6_0",   {"French Attitude"}},
+    {"Personal_6_1",   {"Dutch Attitude"}},
+    {"Personal_9_0",   {"Spanish Rank", translate_rank}},
+    {"Personal_9_1",   {"English Rank", translate_rank}},
+    {"Personal_10_0",  {"French Rank", translate_rank}},
+    {"Personal_10_1",  {"Dutch Rank",  translate_rank}},
+    {"Personal_17",    {"Starting nation", translate_nation}},
+    {"Personal_18_0",  {"000000/have ever danced/1"}},
+    {"Personal_19",    {"Crew"}},
+    {"Personal_20",    {"Gold on hand"}},
+    {"Personal_21",    {"Food"}},
+    {"Personal_22",    {"Luxuries"}},
+    {"Personal_23",    {"Goods"}},
+    {"Personal_24",    {"Spice"}},
+    {"Personal_25",    {"Sugar"}},
+    {"Personal_26",    {"Cannon"}},
+    {"Personal_27",    {"Ship(s) in Fleet"}},
+    {"Personal_44",    {"Wealth in gold"}},
+    {"Personal_45_1",  {"months at sea"}},
+    {"Personal_46_0",  {"Relatives found"}},
+    {"Personal_46_1",  {"Lost cities found"}},
+    {"Personal_52_0",  {"cook/quartermaster/navigator/surgeon/gunner/cooper/sailmaker/carpenter"}},
+};
+
 const string items[] = {
     "balanced swords", "one shot pistol","leather vest", "fencing shirt (puffy)",
     "quality spyglass","dutch rutter","weather glass","3 string fiddle",
@@ -140,13 +161,13 @@ void augment_decoder_groups() {
     // so I'm adding these programmatically. This is sort of like a translation function,
     // but just puts in a comment on each one which is constant regardless of the value.
     int c = sizeof(items)/sizeof(items[0])/2;
-        
+    
     for (int i=0; i<c; i++) {
         int p = 47 + (i/4);
         int pp = i%4;
-        string group = "Personal_" + to_string(p) + "_" + to_string(pp);
+        string line = "Personal_" + to_string(p) + "_" + to_string(pp);
         string comment = "1=" + items[i] + ",    2=" + items[i+c];
-        decoder_groups[group] = {1, CHAR, 1, comment};
+        line_decode[line] = {comment};
     }
 }
 
@@ -237,33 +258,35 @@ unsigned int read_int(ifstream & in) { // Read 4 bytes from in (little endian) a
     char b[4];
     in.read((char*)&b, sizeof(b));
     unsigned int B = (unsigned int)((unsigned char)(b[0]) |
-                (unsigned char)(b[1]) << 8 |
-                (unsigned char)(b[2]) << 16 |
-                (unsigned char)(b[3]) << 24    );
+                                    (unsigned char)(b[1]) << 8 |
+                                    (unsigned char)(b[2]) << 16 |
+                                    (unsigned char)(b[3]) << 24    );
     return B;
 }
 
 void unpack_section (string section, ifstream & in, ofstream & out) {
-    if (decoder_groups.count(section) != 0) {
-        decoder_group dec = decoder_groups.at(section);
+    if (group_decode.count(section) != 0) {
+        auto dec = group_decode.at(section);
         
         for (int c=0; c<dec.count;c++) {
             string subsection = section + "_" + to_string(c);
             string subsection_x = regex_replace(subsection, regex(R"(^([^_]+)_\d+)"), "\\${1}_x");
             
-            auto decode = dec;
             // The subsection or subsection_x have higher priority in translating this line.
             // Example:
             //   subsection   = Ship_0_0_0
             //   subsection_x = Ship_x_0_0
             //   section      = Ship_0_0
             
-            if (decoder_groups.count(subsection)) {
-                decode = decoder_groups.at(subsection);
-                if (decode.count > 1) { unpack_section(subsection, in, out); continue; }
-            } else if (decoder_groups.count(subsection)) {
-                decode = decoder_groups.at(subsection_x);
-                if (decode.count > 1) { unpack_section(subsection, in, out); continue; }
+            if (group_decode.count(subsection)) {
+                unpack_section(subsection, in, out); continue;
+            } else if (group_decode.count(subsection_x)) {
+                unpack_section(subsection, in, out); continue;
+            }
+    
+            auto decode = dec;
+            if (line_decode.count(subsection)) { // Rarely, a line can override the section decode method.
+                if (line_decode.at(subsection).has_alt_decode) { decode = line_decode.at(subsection).alt_decode; }
             }
             
             string value;
@@ -299,15 +322,22 @@ void unpack_section (string section, ifstream & in, ofstream & out) {
             }
             
             string translation;
-            if (decode.translate_fn != nullptr) {
-                translation = decode.translate_fn(value);
-                if (translation != "") {
-                    translation = "(" + translation + ")";
+            if (line_decode.count(subsection)) {
+                if (line_decode.at(subsection).translate_fn != nullptr) {
+                    translation = line_decode.at(subsection).translate_fn(value);
+                    if (translation != "") {
+                        translation = "(" + translation + ")";
+                    }
                 }
             }
             
+            string comment;
+            if (line_decode.count(subsection)) {
+                comment = line_decode.at(subsection).comment;
+            }
+            
             out << subsection << "   : " << char_for_method.at(decode.method) << to_string(decode.size);
-            out << "   :   " << value << "   :   " << decode.comment << " " << translation << "\n";
+            out << "   :   " << value << "   :   " << comment << " " << translation << "\n";
             
         }
     }
