@@ -57,6 +57,9 @@ int main(int argc, char **argv)
     string pack;
     string save_dir = "/usr";
     
+    // Get the pirates module ready to go.
+    augment_decoder_groups();
+   
     while (1) {
         int option_index = 0;
         c = getopt_long_only (argc, argv, "", long_options, &option_index);
