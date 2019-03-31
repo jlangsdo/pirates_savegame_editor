@@ -22,8 +22,4 @@ void augment_decoder_groups();
 void unpack_pg_to_pst(std::string pg, std::string pst);
 void pack_pst_to_pg(std::string pst, std::string pg);
 
-void unpack_section (std::string section,
-                     std::ifstream & in, std::ofstream & out);
-
-
 #endif /* Pirates_hpp */
