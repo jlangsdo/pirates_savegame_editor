@@ -25,11 +25,12 @@ enum translation_type { TEXT0, TEXT8, HEX, INT, BINARY, SHORT, CHAR, mFLOAT, uFL
 // The translation types have one character abbreviations in the pst file.
 const map<translation_type,char> char_for_method = {
     {TEXT0,'t'}, {TEXT8,'t'}, {INT, 'V'}, {HEX, 'h'}, {BINARY, 'B'}, {SHORT, 's'}, {CHAR, 'C'}, {MAP, 'm'}, {BULK, 'H'},
-    {ZERO,'x'},
+    {ZERO,'x'}, {uFLOAT,'G'},
 };
 
 const map<translation_type,char> size_for_method = {
-    {TEXT0,0}, {TEXT8,8}, {INT,4}, {HEX,4}, {BINARY,1}, {SHORT,2}, {CHAR,1}, {MAP,291}, {ZERO,1},
+    {TEXT0,0}, {TEXT8,8}, {INT,4}, {HEX,4}, {BINARY,1}, {SHORT,2}, {CHAR,1}, {MAP,291}, {ZERO,0},
+    {uFLOAT,4},
 };
 
 struct decode_for_line {
@@ -107,10 +108,7 @@ map<string,decode_for_line> line_decode = {
     {"Personal_45_1",  {"months at sea"}},
     {"Personal_46_0",  {"Relatives found"}},
     {"Personal_46_1",  {"Lost cities found"}},
-    {"Personal_51_1",  {"", nullptr, true, ZERO, 3}},
     {"Personal_52_0",  {"cook/quartermaster/navigator/surgeon/gunner/cooper/sailmaker/carpenter"}},
-    {"Personal_52_1",  {"", nullptr, true, BULK, 3}},
-    {"Ship_x_10",      {"", nullptr, true, ZERO, 956}},
 };
 
 
@@ -157,30 +155,53 @@ const vector<section> section_vector = {
     {"m",                 1,      12, },
     {"ShipName",          8,       0,  TEXT8 },
     {"Skill",             1,       4, },
-
+    
 };
 
-struct subsection_info { translation_type method; int line_count=4/size_for_method.at(method); int byte_count=size_for_method.at(method);};
-
-map<string,subsection_info> subsection_decode = {
-    {"Personal_2",    {BINARY}},
-    {"Personal_5",    {SHORT}},
-    {"Personal_6",    {SHORT}},
-    {"Personal_9",    {SHORT}},
-    {"Personal_10",   {SHORT}},
-    {"Personal_18",   {BINARY}},
-    {"Personal_45",   {SHORT}},
-    {"Personal_46",   {SHORT}},
-    {"Personal_47",   {CHAR}},
-    {"Personal_48",   {CHAR}},
-    {"Personal_49",   {CHAR}},
-    {"Personal_50",   {CHAR}},
-    {"Personal_51",   {CHAR,   2}},
-    // Overriding the line_count from the default means that there must be an uneven
-    // division of bytes; something fancy is going on in the line decode.
-    {"Personal_52",   {BINARY, 2}},
-    {"Ship_x",        {BULK,  11, 16}}
+struct subsection_info {
+    translation_type method;
+    int byte_count=size_for_method.at(method);
+    int multiplier=1;
 };
+
+// Split up a line into multiple lines of identically sized smaller types.
+// The size of the new translation_type should divide evenly into the
+// original line size.
+map<string,translation_type> subsection_simple_decode = {
+    {"Personal_2",    BINARY},
+    {"Personal_5",    SHORT},
+    {"Personal_6",    SHORT},
+    {"Personal_9",    SHORT},
+    {"Personal_10",   SHORT},
+    {"Personal_18",   BINARY},
+    {"Personal_45",   SHORT},
+    {"Personal_46",   SHORT},
+    {"Personal_47",   CHAR},
+    {"Personal_48",   CHAR},
+    {"Personal_49",   CHAR},
+    {"Personal_50",   CHAR},
+    {"Ship_x_2",      SHORT},
+    {"Ship_x_3",      SHORT},
+    {"Ship_x_5",      SHORT},
+    {"Ship_x_5_4",    BINARY},
+    {"Ship_x_6",      SHORT},
+    
+};
+
+// split up a section into multiple sections that may be of different types and sizes.
+// Make sure the bytes add up to the size of the original section.
+map<string,vector<subsection_info>> subsection_manual_decode = {
+    {"Personal_51",   {{CHAR}, {ZERO,3}}},           // 4 = 1+3
+    {"Personal_52",   {{BINARY}, {BULK,3}}},         // 4 = 1+3
+    {"Ship_x",        {{BULK,16, 10}, {ZERO,956}}}, // 1116 = 16*10+956
+    {"Ship_x_0",      {{SHORT,2, 6}, {uFLOAT}}},        // 16 = 6*2 + 4
+    {"Ship_x_1",      {{uFLOAT}, {HEX,4, 3}}},         // 16 = 4 + 4*3
+    {"Ship_x_2_6",    {{BINARY}, {BULK,1}}},           // 2 = 1+1
+    {"Ship_x_4",      {{SHORT,2,4}, {INT,4,1}, {ZERO,0,1}, {SHORT,2,2}}},   // 16 = 2*4+4+0+2*2
+};
+
+// The zero length zero string for Ship_x_4_5 happened because two adjacent shorts were switched
+// for an INT and a ZERO. This manuever is required to avoid renumbering (Ship_x_4_7 numbering remained unchanged)
 
 
 const string items[] = {
@@ -237,7 +258,7 @@ string find_file(string dir, string file, string suffix) {
     exit(1);
 }
 
-void unpack_section (section section, ifstream & in, ofstream & out);
+void unpack_section (section section, ifstream & in, ofstream & out, int offset=0);
 
 void unpack_pg_to_pst(string pg_file, string pst_file) {
     ifstream pg_in = ifstream(pg_file, ios::binary);
@@ -278,7 +299,7 @@ string read_hex(ifstream & in) { // Read 4 bytes from in and report in hex
 }
 
 string read_bulk_hex(ifstream & in, int bytecount) { // Read bytecount bytes from in and report in one big bulk hex
-     char b[bytecount];
+    char b[bytecount];
     in.read((char*)&b, bytecount);
     string res;
     char buffer[20];
@@ -294,14 +315,13 @@ string read_zeros(ifstream & in, int bytecount) { // Read bytecount bytes from i
     in.read((char*)&b, bytecount);
     for (int i=0;i<bytecount;i++) {
         if (b[i]!= 0) {
-            cerr << "ERROR: found non-zeros";
-            return "ERROR in zero_string";
+            throw logic_error("Found non-zeros");
         }
     }
     return "zero_string";
 }
-    
-    
+
+
 string read_binary(ifstream & in) { // Read 1 byte from in and report as binary string
     char b;
     in.read((char*)&b, sizeof(b));
@@ -322,7 +342,6 @@ string read_short(ifstream &in) { // Read 2 bytes as a signed int and return as 
     return to_string(B);
 }
 
-
 unsigned int read_int(ifstream & in) { // Read 4 bytes from in (little endian) and convert to integer
     char b[4];
     in.read((char*)&b, sizeof(b));
@@ -333,105 +352,141 @@ unsigned int read_int(ifstream & in) { // Read 4 bytes from in (little endian) a
     return B;
 }
 
-void unpack_section (section section, ifstream & in, ofstream & out) {
-    for (int c=0; c<section.count;c++) {
-            string subsection = section.name + "_" + to_string(c);
+string read_uFloat(ifstream &in) {
+    int raw = read_int(in);
+    return to_string(double(raw)/1000000);
+}
+
+void unpack_section (section section, ifstream & in, ofstream & out, int offset) {
+    for (int c=offset; c<section.count+offset;c++) {
+        string subsection = section.name + "_" + to_string(c);
         string subsection_x = regex_replace(subsection, regex(R"(^([^_]+)_\d+)"), "$1_x");
+        
+        // The subsection or subsection_x have higher priority in translating this line.
+        // Example:
+        //   subsection   = Ship_0_0_0
+        //   subsection_x = Ship_x_0_0
+        //   section      = Ship_0_0
+        
+        if (subsection_simple_decode.count(subsection) || subsection_simple_decode.count(subsection_x)) {
+            translation_type submeth = subsection_simple_decode.count(subsection) ?
+            subsection_simple_decode.at(subsection) : subsection_simple_decode.at(subsection_x);
             
-            // The subsection or subsection_x have higher priority in translating this line.
-            // Example:
-            //   subsection   = Ship_0_0_0
-            //   subsection_x = Ship_x_0_0
-            //   section      = Ship_0_0
+            // Take the the section.byte_count and divide
+            // it equally to set up the subsections.
+            struct::section sub = {subsection,section.bytes_per_line/size_for_method.at(submeth), size_for_method.at(submeth) , submeth };
+            unpack_section(sub, in, out);
+            continue;
+        }
+        
+        if (subsection_manual_decode.count(subsection) || subsection_manual_decode.count(subsection_x)) {
             
-            if (subsection_decode.count(subsection)) {
-                auto info = subsection_decode.at(subsection);
-                translation_type submeth = info.method;
-                struct::section sub = {subsection,info.line_count, info.byte_count , submeth };
-                unpack_section(sub, in, out); continue;
-            } else if (subsection_decode.count(subsection_x)) {
-                auto info = subsection_decode.at(subsection_x);
-                translation_type submeth = info.method;
-                struct::section sub = {subsection_x, info.line_count, info.byte_count,  submeth };
-                unpack_section(sub, in, out); continue;
+            vector<subsection_info> info = subsection_manual_decode.count(subsection) ?
+            subsection_manual_decode.at(subsection) : subsection_manual_decode.at(subsection_x);
+            
+            int suboffset = 0;
+            int byte_count_check = 0;
+            for (auto subinfo : info) {
+                translation_type submeth = subinfo.method;
+                struct::section sub = {subsection,subinfo.multiplier, subinfo.byte_count , submeth };
+                // cerr << subsection << "," << subinfo.multiplier  << "," << subinfo.byte_count << "\n";
+                unpack_section(sub, in, out, suboffset);
+                suboffset += subinfo.multiplier;
+                byte_count_check += subinfo.multiplier*subinfo.byte_count;
             }
-    
+            if (byte_count_check != section.bytes_per_line) {
+                cerr << "Error decoding line " << subsection << " subsections don't add up: " << byte_count_check << " != " << section.bytes_per_line << "\n";
+                out.close();
+                abort();
+                // It will probably crash later anyway.
+            }
+            continue;
+        }
+        
         auto method = section.method;
         auto bytes_per_line = section.bytes_per_line;
         
-            if (line_decode.count(subsection)) { // Rarely, a line can override the section decode method.
-                if (line_decode.at(subsection).has_alt_decode) {
-                    method = line_decode.at(subsection).method;
-                    bytes_per_line = line_decode.at(subsection).bytes_in_line;
-                }
+        if (line_decode.count(subsection)) { // Rarely, a line can override the section decode method.
+            if (line_decode.at(subsection).has_alt_decode) {
+                method = line_decode.at(subsection).method;
+                bytes_per_line = line_decode.at(subsection).bytes_in_line;
             }
-            
-            string value;
-            char buffer[255] = "";
-            unsigned int size_of_string;
-            
-            switch (method) {
-                case TEXT0 : // Stores a length in chars, followed by the text, possibly followed by 0 padding.
-                    size_of_string = read_int(in);
-                    if (size_of_string > 100) { abort(); }
-                    in.read((char *)& buffer, size_of_string);
-                    value = buffer;
-                    break;
-                case TEXT8 : //size_of_string = read_int(in);
-                    size_of_string = read_int(in);
-                    if (size_of_string > 100) { abort(); }
-                    in.read((char *)& buffer, size_of_string);
-                    value = buffer;
-                    in.read(buffer, 8); // Padding
-                    break;
-                case INT :
-                    value = to_string(read_int(in));
-                    break;
-                case ZERO :
+        }
+        
+        string value;
+        char buffer[255] = "";
+        unsigned int size_of_string;
+        
+        switch (method) {
+            case TEXT0 : // Stores a length in chars, followed by the text, possibly followed by 0 padding.
+                size_of_string = read_int(in);
+                if (size_of_string > 100) { abort(); }
+                in.read((char *)& buffer, size_of_string);
+                value = buffer;
+                break;
+            case TEXT8 : //size_of_string = read_int(in);
+                size_of_string = read_int(in);
+                if (size_of_string > 100) { abort(); }
+                in.read((char *)& buffer, size_of_string);
+                value = buffer;
+                in.read(buffer, 8); // Padding
+                break;
+            case INT :
+                value = to_string(read_int(in));
+                break;
+            case ZERO :
+                try {
                     value = read_zeros(in, bytes_per_line);
-                    break;
-                case BULK :
-                    value = read_bulk_hex(in, bytes_per_line);
-                    break;
-                case HEX :
-                    value = read_hex(in);
-                    break;
-                case BINARY :
-                    value = read_binary(in);
-                    break;
-                case SHORT :
-                    value = read_short(in);
-                    break;
-                case CHAR :
-                    value = read_char(in);
-                    break;
-                default:
-                    break;
-            }
-            
-            string translation;
-            if (line_decode.count(subsection)) {
-                if (line_decode.at(subsection).translate_fn != nullptr) {
-                    translation = line_decode.at(subsection).translate_fn(value);
-                    if (translation != "") {
-                        translation = "(" + translation + ")";
-                    }
+                } catch(logic_error) {
+                    out.close();
+                    abort();
+                }
+                break;
+            case BULK :
+                value = read_bulk_hex(in, bytes_per_line);
+                break;
+            case HEX :
+                value = read_hex(in);
+                break;
+            case BINARY :
+                value = read_binary(in);
+                break;
+            case SHORT :
+                value = read_short(in);
+                break;
+            case uFLOAT :
+                value = read_uFloat(in);
+                break;
+            case CHAR :
+                value = read_char(in);
+                break;
+            default:
+                break;
+        }
+        
+        string translation;
+        if (line_decode.count(subsection)) {
+            if (line_decode.at(subsection).translate_fn != nullptr) {
+                translation = line_decode.at(subsection).translate_fn(value);
+                if (translation != "") {
+                    translation = "(" + translation + ")";
                 }
             }
-            
-            string comment;
-            if (line_decode.count(subsection)) {
-                comment = line_decode.at(subsection).comment;
-            }
+        }
+        
+        string comment;
+        if (line_decode.count(subsection)) {
+            comment = line_decode.at(subsection).comment;
+        }
         
         int linesize = bytes_per_line;
         if (method==TEXT0) { linesize = 0;}
         if (method==TEXT8) { linesize = 8;}
         
-            out << subsection << "   : " << char_for_method.at(method) << to_string(linesize);
-            out << "   :   " << value << "   :   " << comment << " " << translation << "\n";
-            
-        }
+        out << subsection << "   : " << char_for_method.at(method) << to_string(linesize);
+        out << "   :   " << value << "   :   " << comment << " " << translation << "\n";
+        
+    }
     
 }
 
