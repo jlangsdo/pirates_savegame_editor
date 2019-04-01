@@ -74,16 +74,25 @@ string translate_nation(string value) {
     }
 }
 
+string translate_specialist_aboard(string value) { return value; }
+string translate_shipname(string value) { return value; }
+string translate_ship_type(string value) { return value; }
+string translate_disposition(string value) { return value; }
+string translate_flag(string value) { return value; }
+string translate_direction(string value) { return value; }
+string translate_city(string value) { return value; }
+string translate_date(string value) { return value; }
+string translate_is_following(string value) { return value; }
+
 string load_city(string value) {
     return "";
 }
 
 map<string,decode_for_line> line_decode = {
-    {"Intro_0", {"", nullptr, true, TEXT0}},
-    {"Intro_1", {"You are here x", nullptr, true, INT}},
-    {"Intro_2", {"You are here y", nullptr, true, INT}},
-    {"Intro_4", {"Difficulty", translate_difficulty, true, INT}},
-    {"Intro_5", {"Last city visited", nullptr, true, INT}}, // Update this to be more clear
+    {"Intro_1",        {"You are here x"}},
+    {"Intro_2",        {"You are here y"}},
+    {"Intro_4",        {"Difficulty", translate_difficulty}},
+    {"Intro_5",        {"Last city visited"}}, // Update this message to be more clear
     {"Personal_2_0",   {"on land/marching perspective/0/0/0/not in battle or city/0/0"}},
     {"Personal_5_0",   {"Spanish Attitude"}},
     {"Personal_5_1",   {"English Attitude"}},
@@ -109,6 +118,39 @@ map<string,decode_for_line> line_decode = {
     {"Personal_46_0",  {"Relatives found"}},
     {"Personal_46_1",  {"Lost cities found"}},
     {"Personal_52_0",  {"cook/quartermaster/navigator/surgeon/gunner/cooper/sailmaker/carpenter"}},
+//    {"Ship_0_0_0", {"Player Flagship Type", translate_ship_type}},   // Put this back in later. Perl code has a bug that makes this not work.
+    {"Ship_x_0_0", {"Ship Type",            translate_ship_type}},
+    {"Ship_x_0_1", {"Disposition",          translate_disposition}},
+    {"Ship_x_0_2", {"Flag",                 translate_flag}},
+    {"Ship_x_0_4", {"Target Ship"}},
+    {"Ship_x_0_6", {"x Coordinate"}},
+    {"Ship_x_1_0", {"y Coordinate"}},
+    {"Ship_x_1_1", {"direction",            translate_direction}},
+    {"Ship_x_1_2", {"speed"}},
+    {"Ship_x_2_0", {"% Damage Sails"}},
+    {"Ship_x_2_1", {"% Damage Hull"}},
+    {"Ship_x_2_2", {"",                     translate_is_following}},
+    {"Ship_x_2_3", {"Crew aboard"}},
+    {"Ship_x_2_4", {"Cannon aboard"}},
+    {"Ship_x_2_6_0", {"upgrades bronze/powder/grape/chain/scantlings/hammocks/sails/copper"}},
+    {"Ship_x_2_7", {"Name code",            translate_shipname}},
+    {"Ship_x_3_0", {"Gold aboard"}},
+    {"Ship_x_3_1", {"Food aboard"}},
+    {"Ship_x_3_2", {"Luxuries aboard"}},
+    {"Ship_x_3_3", {"Goods aboard"}},
+    {"Ship_x_3_4", {"Spice aboard"}},
+    {"Ship_x_3_5", {"Sugar aboard"}},
+    {"Ship_x_3_7", {"Starting city",        translate_city}},
+    {"Ship_x_4_0", {"Destination city",     translate_city}},
+    {"Ship_x_4_4", {"DateStamp",            translate_date}},
+    {"Ship_x_4_7", {"sails"}},
+    {"Ship_x_1_3", {"roll"}},
+    {"Ship_x_5_4_0", {"returning/?/?/?/?/?/?/?"}},
+    {"Ship_x_5_4_1", {"?/?/?/treasure fleet/?/notable/?/docked"}},
+    {"Ship_x_5_5", {"",                     translate_specialist_aboard}},
+    {"Ship_x_5_6", {"Countdown until leaving port"}},
+    {"Ship_x_6_0", {"Battling"}},
+    {"Ship_x_6_1", {"Escorted By"}},
 };
 
 
@@ -126,7 +168,7 @@ struct section {
 //    sections with single letter names are generally not understood.
 //
 const vector<section> section_vector = {
-    {"Intro",             6,       4,  HEX },
+    {"Intro",             6,       4,  INT },
     {"CityName",        128,       0,  TEXT8 },
     {"Personal",         57,       4,  INT },
     {"Ship",            128,    1116, },
@@ -168,6 +210,8 @@ struct subsection_info {
 // The size of the new translation_type should divide evenly into the
 // original line size.
 map<string,translation_type> subsection_simple_decode = {
+    {"Intro_0",       TEXT0},
+    {"Intro_3",       HEX},
     {"Personal_2",    BINARY},
     {"Personal_5",    SHORT},
     {"Personal_6",    SHORT},
@@ -202,6 +246,12 @@ map<string,vector<subsection_info>> subsection_manual_decode = {
 
 // The zero length zero string for Ship_x_4_5 happened because two adjacent shorts were switched
 // for an INT and a ZERO. This manuever is required to avoid renumbering (Ship_x_4_7 numbering remained unchanged)
+// This would almost be the same as adding these subsection_simple_decodes:
+// {"Ship_x_4",      SHORT},
+// {"Ship_x_4_5",    INT},
+// {"Ship_x_4_6",    ZERO},
+// but that isn't allowed. The problem is that ship_x_4_5 would be starting as a SHORT and moving to INT,
+// which means growing from 2 bytes to 4. That's not OK; it means the subsection_decode would be going outside of the subsection.
 
 
 const string items[] = {
@@ -221,7 +271,11 @@ const string items[] = {
 void augment_decoder_groups() {
     // The items need comments in the decoder group that are all the same,
     // so I'm adding these programmatically. This is sort of like a translation function,
-    // but just puts in a comment on each one which is constant regardless of the value.
+    // but it puts in a comment on each one which is constant regardless of the value.
+    //
+    // This is better than a translate for the items because you want to be able to see the item names
+    // for each line, whether you have them or not.
+    //
     int c = sizeof(items)/sizeof(items[0])/2;
     
     for (int i=0; i<c-3; i++) {
@@ -291,7 +345,7 @@ string read_hex(ifstream & in) { // Read 4 bytes from in and report in hex
     string res;
     char buffer[255];
     for (int i=3;i>=0;i--) {
-        sprintf(buffer, "%02X", b[i]);
+        sprintf(buffer, "%02X", (unsigned char)b[i]);
         res += buffer;
         if (i>0) res += '.';
     }
@@ -304,7 +358,7 @@ string read_bulk_hex(ifstream & in, int bytecount) { // Read bytecount bytes fro
     string res;
     char buffer[20];
     for (int i=0;i<bytecount;i++) {
-        sprintf(buffer, "%02X", b[i]);
+        sprintf(buffer, "%02X", (unsigned char)b[i]);
         res += buffer;
     }
     return res;
@@ -372,11 +426,28 @@ void unpack_section (section section, ifstream & in, ofstream & out, int offset)
             translation_type submeth = subsection_simple_decode.count(subsection) ?
             subsection_simple_decode.at(subsection) : subsection_simple_decode.at(subsection_x);
             
-            // Take the the section.byte_count and divide
-            // it equally to set up the subsections.
-            struct::section sub = {subsection,section.bytes_per_line/size_for_method.at(submeth), size_for_method.at(submeth) , submeth };
-            unpack_section(sub, in, out);
-            continue;
+            if (submeth != section.method) { // Avoids infinite loop.
+                // Take the the section.byte_count and divide
+                // it equally to set up the subsections.
+                int count = 1;
+                if (size_for_method.at(submeth)>0) {
+                    count = section.bytes_per_line/size_for_method.at(submeth);
+                }
+                int suboffset = 0;
+                
+                if (count ==1) {
+                    // If there is only one count for the subsection, then we aren't really splitting it up;
+                    // we are changing the translation method of this particular line.
+                    // So, remove the numeric ending and call it again with the corrected method.
+                    // But note the if above to avoid an infinite loop.
+                    subsection = section.name;
+                    suboffset = c;
+                }
+                
+                struct::section sub = {subsection,count, size_for_method.at(submeth) , submeth };
+                unpack_section(sub, in, out, suboffset);
+                continue;
+            }
         }
         
         if (subsection_manual_decode.count(subsection) || subsection_manual_decode.count(subsection_x)) {
@@ -406,13 +477,6 @@ void unpack_section (section section, ifstream & in, ofstream & out, int offset)
         auto method = section.method;
         auto bytes_per_line = section.bytes_per_line;
         
-        if (line_decode.count(subsection)) { // Rarely, a line can override the section decode method.
-            if (line_decode.at(subsection).has_alt_decode) {
-                method = line_decode.at(subsection).method;
-                bytes_per_line = line_decode.at(subsection).bytes_in_line;
-            }
-        }
-        
         string value;
         char buffer[255] = "";
         unsigned int size_of_string;
@@ -420,13 +484,13 @@ void unpack_section (section section, ifstream & in, ofstream & out, int offset)
         switch (method) {
             case TEXT0 : // Stores a length in chars, followed by the text, possibly followed by 0 padding.
                 size_of_string = read_int(in);
-                if (size_of_string > 100) { abort(); }
+                if (size_of_string > 100) { out.close(); abort(); }
                 in.read((char *)& buffer, size_of_string);
                 value = buffer;
                 break;
             case TEXT8 : //size_of_string = read_int(in);
                 size_of_string = read_int(in);
-                if (size_of_string > 100) { abort(); }
+                if (size_of_string > 100) { out.close(); abort(); }
                 in.read((char *)& buffer, size_of_string);
                 value = buffer;
                 in.read(buffer, 8); // Padding
@@ -465,6 +529,14 @@ void unpack_section (section section, ifstream & in, ofstream & out, int offset)
         }
         
         string translation;
+        if (line_decode.count(subsection_x)) {
+            if (line_decode.at(subsection_x).translate_fn != nullptr) {
+                translation = line_decode.at(subsection_x).translate_fn(value);
+                if (translation != "") {
+                    translation = "(" + translation + ")";
+                }
+            }
+        }
         if (line_decode.count(subsection)) {
             if (line_decode.at(subsection).translate_fn != nullptr) {
                 translation = line_decode.at(subsection).translate_fn(value);
@@ -475,6 +547,9 @@ void unpack_section (section section, ifstream & in, ofstream & out, int offset)
         }
         
         string comment;
+        if (line_decode.count(subsection_x)) {
+            comment = line_decode.at(subsection_x).comment;
+        }
         if (line_decode.count(subsection)) {
             comment = line_decode.at(subsection).comment;
         }
