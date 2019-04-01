@@ -33,76 +33,118 @@ const map<translation_type,char> size_for_method = {
     {uFLOAT,4},
 };
 
-struct decode_for_line {
-    string comment = "";
-    string (*translate_fn)(string line) = nullptr;
-    bool has_alt_decode = false;
-    translation_type method = HEX;
-    int bytes_in_line = size_for_method.at(method);
+enum translatable {
+    // All translatable enums should be mapped in the translation_lists
+    NIL, RANK, DIFFICULTY, NATION, FLAG, SKILL, SPECIAL_MOVE, SHIP_TYPE,
+    DISPOSITION, BEAUTY, UPGRADES, CITYNAME, DIRECTION,
+    // or in the translation_functions
+    DIR,
 };
 
+map <translatable, vector<string>> translation_lists = {
+    { RANK,
+        { "No Rank", "Letter_of_Marque", "Captain", "Major", "Colonel",
+        "Admiral", "Baron", "Count", "Marquis", "Duke"}},
+    { DIFFICULTY,
+        { "Apprentice", "Journeyman", "Adventurer", "Rogue", "Swashbuckler" }},
+    { NATION, { "Spanish", "English", "French", "Dutch"}},
+    { FLAG, {"Spanish", "English", "French", "Dutch", "Pirate", "Indian", "Jesuit", "Settlement"}},
+    { SKILL, { "Fencing", "Gunnery", "Navigation", "Medicine", "Wit and Charm"}},
+    { SPECIAL_MOVE, { "IDLE", "high chop", "jump", "swing", "parry", "dodge", "duck",
+        "low slash", "quick thrust", "taunt", "NONE"}},
+    { SHIP_TYPE,
+        {   "War Canoe",   "Sloop",        "Brigatine",   "Coastal Barque", "Fluyt",         "Merchantman",       "Frigate",          "Fast Galleon", "Trade Galleon",
+            "Pinnace",     "Sloop of War", "Brig",        "Barque",         "Large Fluyt",   "Large Merchantman", "Large Frigate",    "War Galleon",  "Royal Galleon",
+            "Mail Runner", "Royal Sloop",  "Brig of War", "Ocean Barque",   "West Indiaman", "East Indiaman",     "Ship of the Line", "Flag Galleon", "Treasure Galleon"}},
+    
+    { DISPOSITION, { "", "pirate hunter", "privateer", "raider", "smuggler", "?", "escort"}},
+    { BEAUTY, {"rather plain", "attractive", "beautiful"}},
+    { UPGRADES, {"copper plating", "cotton sails", "triple hammocks", "iron scantlings",
+        "chain shot", "grape shot", "fine grain powder", "bronze cannon"}},
+    { DIRECTION, {"N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW", "N"}},
+    // CITYNAME is loaded during the reading of the CityName section, for use in other sections like Ship.
+};
 
-string translate_skill(string line) { return line; }
+string translate_dir (string value);
 
-string translate_difficulty(string value) {
-    int as_int = stoi(value);
-    const string difficulties[] = { "Apprentice", "Journeyman", "Adventurer", "Rogue", "Swashbuckler" };
-    if (as_int >= 0 && as_int < sizeof(difficulties)) {
-        return difficulties[as_int];
+// Translations that require special effort or which are called to store data.
+map <translatable, string (*)(string)> translation_functions = {
+    { DIR, translate_dir }
+};
+
+int read_hex (char c) { // Reads a char ascii value, returns digital equivalent when read as hex.
+    int res = (int)(c-'0');
+    if (res >= 0 && res <= 9) { return res;}
+    
+    res = (int)(c-'A'+10);
+    if (res >=10 && res <=15) { return res;}
+   
+    throw out_of_range("Bad digit conversion to hex for " + to_string(c));
+}
+
+
+string translate(translatable t, string value) {
+    if (t == NIL) { return ""; }
+    
+    if (t == CITYNAME) {
+        // Just for the breakpoint.
+        
+    }
+    
+    if (translation_lists.count(t)) {
+        // Simple translation from a list.
+        int as_int = stoi(value);
+        vector<string> list = translation_lists.at(t);
+        if (as_int >= 0 && as_int < list.size()) {
+            if (list.at(as_int).size() > 0) {
+                return "(" + list.at(as_int) + ")";
+            } else { return ""; }
+        } else {
+            // For backward compatability to perl version of this code.
+            return "(NIL)";
+        }
+    } else if (translation_functions.count(t)) {
+        // Special translations that require their own functions.
+        return translation_functions.at(t)(value);
     } else {
-        return "UNKNOWN";
+        throw logic_error("Problem with translation of translatable " + to_string(t));
     }
 }
-string translate_rank(string value) {
-    int as_int = stoi(value);
-    const string ranks[] = { "No Rank", "Letter_of_Marque", "Captain", "Major", "Colonel",
-        "Admiral", "Baron", "Count", "Marquis", "Duke"};
-    if (as_int >= 0 && as_int < sizeof(ranks)) {
-        return ranks[as_int];
-    } else {
-        return "UNKNOWN";
-    }
+
+string translate_dir (string value) {
+    char first_char = value.at(0);
+    char second_char = value.at(1);
+    
+    int dir = read_hex(first_char);
+    int next_digit = read_hex(second_char);
+    if (next_digit > 7) { dir++; }
+    
+    return translate(DIRECTION, to_string(dir));
+    
 }
-
-string translate_nation(string value) {
-    int as_int = stoi(value);
-    const string ranks[] = { "Spanish", "English", "French", "Dutch"};
-    if (as_int >= 0 && as_int < sizeof(ranks)) {
-        return ranks[as_int];
-    } else {
-        return "UNKNOWN";
-    }
-}
-
-string translate_specialist_aboard(string value) { return value; }
-string translate_shipname(string value) { return value; }
-string translate_ship_type(string value) { return value; }
-string translate_disposition(string value) { return value; }
-string translate_flag(string value) { return value; }
-string translate_direction(string value) { return value; }
-string translate_city(string value) { return value; }
-string translate_date(string value) { return value; }
-string translate_is_following(string value) { return value; }
-
 string load_city(string value) {
     return "";
 }
 
+struct decode_for_line {
+    string comment = "";
+    translatable t = NIL;
+};
 map<string,decode_for_line> line_decode = {
     {"Intro_1",        {"You are here x"}},
     {"Intro_2",        {"You are here y"}},
-    {"Intro_4",        {"Difficulty", translate_difficulty}},
-    {"Intro_5",        {"Last city visited"}}, // Update this message to be more clear
+    {"Intro_4",        {"Difficulty", DIFFICULTY}},
+    {"Intro_5",        {"Last city visited"}}, // TODO: Update this message to be more clear
     {"Personal_2_0",   {"on land/marching perspective/0/0/0/not in battle or city/0/0"}},
     {"Personal_5_0",   {"Spanish Attitude"}},
     {"Personal_5_1",   {"English Attitude"}},
     {"Personal_6_0",   {"French Attitude"}},
     {"Personal_6_1",   {"Dutch Attitude"}},
-    {"Personal_9_0",   {"Spanish Rank", translate_rank}},
-    {"Personal_9_1",   {"English Rank", translate_rank}},
-    {"Personal_10_0",  {"French Rank", translate_rank}},
-    {"Personal_10_1",  {"Dutch Rank",  translate_rank}},
-    {"Personal_17",    {"Starting nation", translate_nation}},
+    {"Personal_9_0",   {"Spanish Rank", RANK}},
+    {"Personal_9_1",   {"English Rank", RANK}},
+    {"Personal_10_0",  {"French Rank",  RANK}},
+    {"Personal_10_1",  {"Dutch Rank",   RANK}},
+    {"Personal_17",    {"Starting nation", NATION}},
     {"Personal_18_0",  {"000000/have ever danced/1"}},
     {"Personal_19",    {"Crew"}},
     {"Personal_20",    {"Gold on hand"}},
@@ -118,36 +160,36 @@ map<string,decode_for_line> line_decode = {
     {"Personal_46_0",  {"Relatives found"}},
     {"Personal_46_1",  {"Lost cities found"}},
     {"Personal_52_0",  {"cook/quartermaster/navigator/surgeon/gunner/cooper/sailmaker/carpenter"}},
-//    {"Ship_0_0_0", {"Player Flagship Type", translate_ship_type}},   // Put this back in later. Perl code has a bug that makes this not work.
-    {"Ship_x_0_0", {"Ship Type",            translate_ship_type}},
-    {"Ship_x_0_1", {"Disposition",          translate_disposition}},
-    {"Ship_x_0_2", {"Flag",                 translate_flag}},
+    //    {"Ship_0_0_0", {"Player Flagship Type", SHIP_TYPE }},   // TODO: Put this back in later. Perl code has a bug that makes this not work.
+    {"Ship_x_0_0", {"Ship Type",       SHIP_TYPE }},//    translate_ship_type}},
+    {"Ship_x_0_1", {"Disposition",     DISPOSITION }},//      translate_disposition}},
+    {"Ship_x_0_2", {"Flag",            FLAG   }},
     {"Ship_x_0_4", {"Target Ship"}},
     {"Ship_x_0_6", {"x Coordinate"}},
     {"Ship_x_1_0", {"y Coordinate"}},
-    {"Ship_x_1_1", {"direction",            translate_direction}},
+    {"Ship_x_1_1", {"direction",       DIR  }},
     {"Ship_x_1_2", {"speed"}},
     {"Ship_x_2_0", {"% Damage Sails"}},
     {"Ship_x_2_1", {"% Damage Hull"}},
-    {"Ship_x_2_2", {"",                     translate_is_following}},
+    {"Ship_x_2_2", {"",                   }},//     translate_is_following}},
     {"Ship_x_2_3", {"Crew aboard"}},
     {"Ship_x_2_4", {"Cannon aboard"}},
     {"Ship_x_2_6_0", {"upgrades bronze/powder/grape/chain/scantlings/hammocks/sails/copper"}},
-    {"Ship_x_2_7", {"Name code",            translate_shipname}},
+    {"Ship_x_2_7", {"Name code",          }},//     translate_shipname}},
     {"Ship_x_3_0", {"Gold aboard"}},
     {"Ship_x_3_1", {"Food aboard"}},
     {"Ship_x_3_2", {"Luxuries aboard"}},
     {"Ship_x_3_3", {"Goods aboard"}},
     {"Ship_x_3_4", {"Spice aboard"}},
     {"Ship_x_3_5", {"Sugar aboard"}},
-    {"Ship_x_3_7", {"Starting city",        translate_city}},
-    {"Ship_x_4_0", {"Destination city",     translate_city}},
-    {"Ship_x_4_4", {"DateStamp",            translate_date}},
+    {"Ship_x_3_7", {"Starting city",       CITYNAME }},//    translate_city}},
+    {"Ship_x_4_0", {"Destination city",    CITYNAME }},//    translate_city}},
+    {"Ship_x_4_4", {"DateStamp",           }},//    translate_date}},
     {"Ship_x_4_7", {"sails"}},
     {"Ship_x_1_3", {"roll"}},
     {"Ship_x_5_4_0", {"returning/?/?/?/?/?/?/?"}},
     {"Ship_x_5_4_1", {"?/?/?/treasure fleet/?/notable/?/docked"}},
-    {"Ship_x_5_5", {"",                     translate_specialist_aboard}},
+    {"Ship_x_5_5", {"",                    }},//    translate_specialist_aboard}},
     {"Ship_x_5_6", {"Countdown until leaving port"}},
     {"Ship_x_6_0", {"Battling"}},
     {"Ship_x_6_1", {"Escorted By"}},
@@ -352,6 +394,13 @@ string read_hex(ifstream & in) { // Read 4 bytes from in and report in hex
     return res;
 }
 
+std::string str_tolower(std::string s) {
+    std::transform(s.begin(), s.end(), s.begin(),
+                   [](unsigned char c){ return std::tolower(c); } // correct
+                   );
+    return s;
+}
+
 string read_bulk_hex(ifstream & in, int bytecount) { // Read bytecount bytes from in and report in one big bulk hex
     char b[bytecount];
     in.read((char*)&b, bytecount);
@@ -361,7 +410,7 @@ string read_bulk_hex(ifstream & in, int bytecount) { // Read bytecount bytes fro
         sprintf(buffer, "%02X", (unsigned char)b[i]);
         res += buffer;
     }
-    return res;
+    return str_tolower(res);
 }
 
 string read_zeros(ifstream & in, int bytecount) { // Read bytecount bytes from in that should all be zero.
@@ -529,21 +578,12 @@ void unpack_section (section section, ifstream & in, ofstream & out, int offset)
         }
         
         string translation;
+           
         if (line_decode.count(subsection_x)) {
-            if (line_decode.at(subsection_x).translate_fn != nullptr) {
-                translation = line_decode.at(subsection_x).translate_fn(value);
-                if (translation != "") {
-                    translation = "(" + translation + ")";
-                }
-            }
+            translation = translate(line_decode.at(subsection_x).t, value);
         }
         if (line_decode.count(subsection)) {
-            if (line_decode.at(subsection).translate_fn != nullptr) {
-                translation = line_decode.at(subsection).translate_fn(value);
-                if (translation != "") {
-                    translation = "(" + translation + ")";
-                }
-            }
+            translation = translate(line_decode.at(subsection).t, value);
         }
         
         string comment;
@@ -560,6 +600,11 @@ void unpack_section (section section, ifstream & in, ofstream & out, int offset)
         
         out << subsection << "   : " << char_for_method.at(method) << to_string(linesize);
         out << "   :   " << value << "   :   " << comment << " " << translation << "\n";
+        
+        // Save these for later translations.
+        if (section.name == "CityName") {
+            translation_lists[CITYNAME].push_back(value);
+        }
         
     }
     

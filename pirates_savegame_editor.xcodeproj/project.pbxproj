@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		153F2B9A224EC78E00CCA927 /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 153F2B99224EC78E00CCA927 /* main.cpp */; };
+		15874C5722526BD60046F95F /* ship_names.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 15874C5522526BD60046F95F /* ship_names.cpp */; };
 		158A9BEA224F95210062534D /* Pirates.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 158A9BE8224F95210062534D /* Pirates.cpp */; };
 /* End PBXBuildFile section */
 
@@ -26,6 +27,8 @@
 /* Begin PBXFileReference section */
 		153F2B96224EC78E00CCA927 /* pirates_savegame_editor */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = pirates_savegame_editor; sourceTree = BUILT_PRODUCTS_DIR; };
 		153F2B99224EC78E00CCA927 /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
+		15874C5522526BD60046F95F /* ship_names.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ship_names.cpp; sourceTree = "<group>"; };
+		15874C5622526BD60046F95F /* ship_names.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = ship_names.hpp; sourceTree = "<group>"; };
 		158A9BE8224F95210062534D /* Pirates.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Pirates.cpp; sourceTree = "<group>"; };
 		158A9BE9224F95210062534D /* Pirates.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = Pirates.hpp; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -44,6 +47,8 @@
 		153F2B8D224EC78E00CCA927 = {
 			isa = PBXGroup;
 			children = (
+				15874C5522526BD60046F95F /* ship_names.cpp */,
+				15874C5622526BD60046F95F /* ship_names.hpp */,
 				158A9BE8224F95210062534D /* Pirates.cpp */,
 				158A9BE9224F95210062534D /* Pirates.hpp */,
 				153F2B98224EC78E00CCA927 /* pirates_savegame_editor */,
@@ -125,6 +130,7 @@
 			files = (
 				158A9BEA224F95210062534D /* Pirates.cpp in Sources */,
 				153F2B9A224EC78E00CCA927 /* main.cpp in Sources */,
+				15874C5722526BD60046F95F /* ship_names.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
