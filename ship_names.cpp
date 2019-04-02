@@ -20,7 +20,7 @@ string save_last_flag(string value) {
 }
 
 int last_shiptype = 0;
-string save_last_shiptype(string value) {
+string save_last_shiptype(string value, string line_code) {
     last_shiptype = stoi(value);
     return "";
 }
@@ -685,9 +685,9 @@ void load_pirate_shipnames() {
     }
 }
 
-string translate_shipname(string value) {
-    if (last_flag == "") { return "(NIL)"; }
-    if (last_shiptype < 0 || last_shiptype > shipname_type_by_class.size()) { return "(NIL)"; }
+string translate_shipname(string value, string line_code) {
+    if (last_flag == "") { return "NIL"; }
+    if (last_shiptype < 0 || last_shiptype > shipname_type_by_class.size()) { return "NIL"; }
 
     // Assemble the shipname_group a combination of the flag and shiptype,
     // to know which list of shipnames to use.
@@ -705,11 +705,11 @@ string translate_shipname(string value) {
         vector<string> & list = shipnames_list.at(shipname_group);
         if (as_int >= 0 && as_int < list.size()) {
             if (list.at(as_int).size() > 0) {
-                return "(" + list.at(as_int) + ")";
+                return list.at(as_int);
             }
         }
     } else {
         throw logic_error("Bad shipname_group " + shipname_group);
     }
-    return "(NIL)";
+    return "NIL";
 }

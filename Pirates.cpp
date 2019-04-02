@@ -15,10 +15,18 @@
 #include <map>
 #include <optional>
 #include <vector>
+#include <cmath>
 #include "ship_names.hpp"
+#include <chrono>
+#include <ctime>
+#include <sstream>
+#include <iomanip>
 using namespace std;
 
+int index_from_linecode (string line_code);
 
+const vector<string> specialists = {
+    "cook", "quartermaster", "navigator", "surgeon", "gunner", "cooper", "sailmaker", "carpenter" };
 
 //
 enum translation_type { TEXT0, TEXT8, HEX, INT, BINARY, SHORT, CHAR, mFLOAT, uFLOAT, MAP, BULK, ZERO };
@@ -31,15 +39,17 @@ const map<translation_type,char> char_for_method = {
 
 const map<translation_type,char> size_for_method = {
     {TEXT0,0}, {TEXT8,8}, {INT,4}, {HEX,4}, {BINARY,1}, {SHORT,2}, {CHAR,1}, {MAP,291}, {ZERO,0},
-    {uFLOAT,4},
+    {uFLOAT,4}, {BULK, 4},
 };
 
 enum translatable {
     // All translatable enums should be mapped in the translation_lists
     NIL, RANK, DIFFICULTY, NATION, FLAG, SKILL, SPECIAL_MOVE, SHIP_TYPE,
     DISPOSITION, BEAUTY, UPGRADES, CITYNAME, DIRECTION,
+    WEALTH_CLASS, POPULATION_CLASS, SOLDIERS, FLAG_TYPE,
     // or in the translation_functions
-    DIR, SHIPNAME, STORE_CITYNAME,
+    DIR, SHIPNAME, STORE_CITYNAME, DATE, FOLLOWING, SPECIALIST, CITY_BY_LINECODE, WEALTH, POPULATION,
+    POPULATION_TYPE,
 };
 
 map <translatable, vector<string>> translation_lists = {
@@ -49,7 +59,8 @@ map <translatable, vector<string>> translation_lists = {
     { DIFFICULTY,
         { "Apprentice", "Journeyman", "Adventurer", "Rogue", "Swashbuckler" }},
     { NATION, { "Spanish", "English", "French", "Dutch"}},
-    { FLAG, {"Spanish", "English", "French", "Dutch", "Pirate", "Indian", "Jesuit", "Settlement"}},
+    { FLAG,      {"Spanish",      "English",      "French",      "Dutch",      "Pirate", "Indian", "Jesuit", "Settlement"}},
+    { FLAG_TYPE, {"Spanish City", "English City", "French City", "Dutch City", "Pirate", "Indian", "Jesuit", "Settlement"}},
     { SKILL, { "Fencing", "Gunnery", "Navigation", "Medicine", "Wit and Charm"}},
     { SPECIAL_MOVE, { "IDLE", "high chop", "jump", "swing", "parry", "dodge", "duck",
         "low slash", "quick thrust", "taunt", "NONE"}},
@@ -64,25 +75,54 @@ map <translatable, vector<string>> translation_lists = {
         "chain shot", "grape shot", "fine grain powder", "bronze cannon"}},
     { DIRECTION, {"N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW", "N"}},
     // CITYNAME is loaded during the reading of the CityName section, for use in other sections like Ship.
+    { WEALTH_CLASS, {"quiet and desolate", "baking in the sun", "bustling with activity","clean and prosperous", "brimming with wealth",}},
+    { POPULATION_CLASS, {"Farmers", "Colonists",  "Craftsmen", "Landowners", "Citizens","Merchants"}},
 };
 
-string translate_dir (string value);
+string translate_dir (string value, string line_code);
+string translate_date (string value, string line_code);
+string translate_specialist (string value, string line_code);
+string translate_city_by_linecode(string value, string line_code);
+string translate_wealth(string value, string line_code);
+string translate_population_type(string value, string line_code);
+string translate_population(string value, string line_code);
 
-string store_cityname (string value) {
+string translate_soldiers(string value, string line_code) {
+    int as_int = stoi(value);
+    if (as_int > 0) { return to_string(as_int*20);}
+    else { return "None";}
+}
+string translate_population(string value, string line_code) {
+    return to_string( 200 * stoi(value));
+}
+
+string translate_following(string value, string line_code) {
+    if (value == "-2") { return "following player";}
+    else { return ""; }
+}
+
+string store_cityname (string value, string line_code) {
     // Save names of cities for later translations.
     translation_lists[CITYNAME].push_back(value);
     return "";
 }
 
-string store_flag(string value);
+string store_flag(string value, string line_code);
 
 // Translations that require special effort or which are called to store data.
-map <translatable, string (*)(string)> translation_functions = {
+map <translatable, string (*)(string, string)> translation_functions = {
     { DIR, translate_dir },
     { STORE_CITYNAME, store_cityname },
     { FLAG, store_flag },
     { SHIP_TYPE, save_last_shiptype },
     { SHIPNAME, translate_shipname },
+    { DATE, translate_date },
+    { FOLLOWING, translate_following },
+    { SPECIALIST, translate_specialist },
+    { CITY_BY_LINECODE, translate_city_by_linecode},
+    { SOLDIERS, translate_soldiers},
+    { POPULATION, translate_population},
+    { WEALTH, translate_wealth},
 };
 
 
@@ -104,17 +144,17 @@ string simple_translate (translatable t, string value) {
         vector<string> list = translation_lists.at(t);
         if (as_int >= 0 && as_int < list.size()) {
             if (list.at(as_int).size() > 0) {
-                return "(" + list.at(as_int) + ")";
+                return list.at(as_int);
             } else { return ""; }
         } else {
             // For backward compatability to perl version of this code.
-            return "(NIL)";
+            return "NIL";
         }
     }
     return "";
 }
 
-string translate(translatable t, string value) {
+string translate(translatable t, string value, string line_code) {
     if (t == NIL) { return ""; }
     
     string return_value = "";
@@ -122,7 +162,7 @@ string translate(translatable t, string value) {
     if (translation_functions.count(t)) {
         // Special translations that require their own functions,
         // or which store this data for future translations.
-        return_value = translation_functions.at(t)(value);
+        return_value = translation_functions.at(t)(value, line_code);
     }
     
     if (translation_lists.count(t)) {
@@ -136,18 +176,30 @@ string translate(translatable t, string value) {
     // first and then return the value from the list. This is to cover the common case where the function
     // is for storing the value somewhere.
     
+    if (return_value != "") { return_value = "(" + return_value + ")"; }
     return return_value;
 }
 
 
-string store_flag(string value){
+string store_flag(string value, string line_code){
     string myflag = simple_translate(FLAG, value);
     myflag = regex_replace(myflag, regex("[\\(\\)]"),"");
     save_last_flag(myflag);
     return "";
 }
 
-string translate_dir (string value) {
+vector<int> stored_city_wealth (128);
+string translate_wealth(string value, string line_code) {
+    int index = index_from_linecode(line_code);
+    int wealth = stoi(value);
+    stored_city_wealth[index] = wealth;
+    
+    if (wealth != 300 ) {
+        return simple_translate(WEALTH_CLASS, to_string(wealth/40) );
+    } else { return ""; }
+}
+
+string translate_dir (string value, string line_code) {
     char first_char = value.at(0);
     char second_char = value.at(1);
     
@@ -155,12 +207,29 @@ string translate_dir (string value) {
     int next_digit = read_hex(second_char);
     if (next_digit > 7) { dir++; }
     
-    return translate(DIRECTION, to_string(dir));
+    return simple_translate(DIRECTION, to_string(dir));
     
 }
-string load_city(string value) {
-    return "";
+
+int index_from_linecode (string line_code) { // Given Ship_23_1_4, returns 23
+    string line = regex_replace(line_code, regex("^[^_]+_"), "");
+    line = regex_replace(line,regex("[ _].*"), "");
+    return stoi(line);
 }
+
+string translate_city_by_linecode (string value, string line_code) { // In this case, we aren't translating the value,
+    int index = index_from_linecode(line_code);           // but rather noting which cityname goes with this line_code.
+    return simple_translate(CITYNAME, to_string(index));
+}
+
+string translate_specialist (string value, string line_code) {
+    // If a specialist is on board, then Ship_x_5_5 will be set to 10
+    // and which specialist it is depends on the ship number.
+    if (value != "10") { return ""; }
+    int index = index_from_linecode(line_code);
+    return  specialists[7 - (index % 8) ] + " on board";
+}
+
 
 struct decode_for_line {
     string comment = "";
@@ -198,10 +267,10 @@ map<string,decode_for_line> line_decode = {
     {"Personal_45_1",  {"months at sea"}},
     {"Personal_46_0",  {"Relatives found"}},
     {"Personal_46_1",  {"Lost cities found"}},
-    {"Personal_52_0",  {"cook/quartermaster/navigator/surgeon/gunner/cooper/sailmaker/carpenter"}},
+    // {"Personal_52_0",  {"cook/quartermaster/navigator/surgeon/gunner/cooper/sailmaker/carpenter"}}, // do this automatically below.
     //    {"Ship_0_0_0", {"Player Flagship Type", SHIP_TYPE }},   // TODO: Put this back in later. Perl code has a bug that makes this not work.
-    {"Ship_x_0_0", {"Ship Type",       SHIP_TYPE }},//    translate_ship_type}},
-    {"Ship_x_0_1", {"Disposition",     DISPOSITION }},//      translate_disposition}},
+    {"Ship_x_0_0", {"Ship Type",       SHIP_TYPE }},
+    {"Ship_x_0_1", {"Disposition",     DISPOSITION }},
     {"Ship_x_0_2", {"Flag",            FLAG   }},
     {"Ship_x_0_4", {"Target Ship"}},
     {"Ship_x_0_6", {"x Coordinate"}},
@@ -210,7 +279,7 @@ map<string,decode_for_line> line_decode = {
     {"Ship_x_1_2", {"speed"}},
     {"Ship_x_2_0", {"% Damage Sails"}},
     {"Ship_x_2_1", {"% Damage Hull"}},
-    {"Ship_x_2_2", {"",                   }},//     translate_is_following}},
+    {"Ship_x_2_2", {"",                 FOLLOWING  }},
     {"Ship_x_2_3", {"Crew aboard"}},
     {"Ship_x_2_4", {"Cannon aboard"}},
     {"Ship_x_2_6_0", {"upgrades bronze/powder/grape/chain/scantlings/hammocks/sails/copper"}},
@@ -223,15 +292,29 @@ map<string,decode_for_line> line_decode = {
     {"Ship_x_3_5", {"Sugar aboard"}},
     {"Ship_x_3_7", {"Starting city",       CITYNAME }},
     {"Ship_x_4_0", {"Destination city",    CITYNAME }},
-    {"Ship_x_4_4", {"DateStamp",           }},//    translate_date}},
+    {"Ship_x_4_4", {"DateStamp",           DATE }},
     {"Ship_x_4_7", {"sails"}},
     {"Ship_x_1_3", {"roll"}},
     {"Ship_x_5_4_0", {"returning/?/?/?/?/?/?/?"}},
     {"Ship_x_5_4_1", {"?/?/?/treasure fleet/?/notable/?/docked"}},
-    {"Ship_x_5_5", {"",                    }},//    translate_specialist_aboard}},
+    {"Ship_x_5_5", {"",                    SPECIALIST }},
     {"Ship_x_5_6", {"Countdown until leaving port"}},
     {"Ship_x_6_0", {"Battling"}},
     {"Ship_x_6_1", {"Escorted By"}},
+    {"City_x_0",   {"x coordinate",     CITY_BY_LINECODE }},
+    {"City_x_1",   {"y coordinate",           }},
+    {"City_x_2_0", {"?/0/0/0/0/?/has a port/details visible"}},
+    {"City_x_2_1", {"city without port/0/?/news this month/grudge/indian_or_jesuit/0/?", CITY_BY_LINECODE}},
+    {"City_x_2_2", {"0/0/0/0/0/daughter visible/grateful/unfriendly", CITY_BY_LINECODE}},
+    {"City_x_2_3", {"city_off/0/0/0/0/?/?/?",  CITY_BY_LINECODE}},
+    {"City_x_3_0", {"Flag",        FLAG}},
+    {"City_x_3_1", {"Population",  POPULATION}},
+    {"City_x_3_2", {"Soldiers",    SOLDIERS}},
+     // "City_x_3_3" is a number from 0..4. The 3 and 4 values are for wealthy spanish capitals.
+     // The value is the same for all savegames. Probably a target city class.
+    {"City_x_5",   { "Wealth",    WEALTH}},
+    {"City_x_6",   {"Type",       FLAG_TYPE}},
+
 };
 
 
@@ -310,7 +393,10 @@ map<string,translation_type> subsection_simple_decode = {
     {"Ship_x_5",      SHORT},
     {"Ship_x_5_4",    BINARY},
     {"Ship_x_6",      SHORT},
-    
+    {"City_x",        INT},
+    {"City_x_2",      BINARY},
+    {"City_x_4",      BULK},
+    {"City_x_7",      BULK},
 };
 
 // split up a section into multiple sections that may be of different types and sizes.
@@ -323,6 +409,8 @@ map<string,vector<subsection_info>> subsection_manual_decode = {
     {"Ship_x_1",      {{uFLOAT}, {HEX,4, 3}}},         // 16 = 4 + 4*3
     {"Ship_x_2_6",    {{BINARY}, {BULK,1}}},           // 2 = 1+1
     {"Ship_x_4",      {{SHORT,2,4}, {INT,4,1}, {ZERO,0,1}, {SHORT,2,2}}},   // 16 = 2*4+4+0+2*2
+    {"f_x",           {{BULK,2}, {ZERO,98}, {BULK,2}, {ZERO, 1014}}},   // 2+98+2+1014 = 1116
+    {"City_x_3",      {{CHAR,1,3}, {BULK,1}}},       // 4 = 3+1. Calling it BULK to match perl. Nonstandard BULK size.
 };
 
 // The zero length zero string for Ship_x_4_5 happened because two adjacent shorts were switched
@@ -349,6 +437,7 @@ const string items[] = {
     "signal flare","","","",
 };
 
+
 void augment_decoder_groups() {
     // The items need comments in the decoder group that are all the same,
     // so I'm adding these programmatically. This is sort of like a translation function,
@@ -366,6 +455,15 @@ void augment_decoder_groups() {
         string comment = "1=" + items[i] + ",    2=" + items[i+c];
         line_decode[line] = {comment};
     }
+    
+    
+    // The list of specialists is also needed in the translate_specialist routine.
+    string sp = "";
+    for (auto specialist : specialists) {
+        sp += specialist + "/";
+    }
+    sp = regex_replace(sp, regex("/$"), "");
+    line_decode["Personal_52_0"] = {sp};
 }
 
 string find_file(string dir, string file, string suffix) {
@@ -494,6 +592,42 @@ unsigned int read_int(ifstream & in) { // Read 4 bytes from in (little endian) a
     return B;
 }
 
+int starting_year;
+void store_startingyear(ifstream & in) {
+    // We're going to jump way forward in the file to read the start year, and then put it into a persistent
+    // variable, for use in decoding DateStamps. Then jump right back.
+    constexpr int jump_dist = 887272;
+    in.seekg(jump_dist, ios_base::cur);
+    starting_year = (int)read_int(in);
+    in.seekg(-jump_dist-4, ios_base::cur);
+}
+
+string translate_date(string value, string section) { // Translate the datestamp into a date in game time.
+    double stamp = stoi(value);
+    if (stamp == 0 || stamp == -1) { return ""; }
+    
+    // I have no idea where the 197.2 comes from; in this formula.
+    // I probably derived it empirically when working out the perl version
+    // Perhaps it should really be 200.
+    //
+    // As I read it, the datestamp integer increases by about 197.2 each day of game time.
+    //
+    time_t myt = stamp*24*3600/197.2;
+    stringstream st;
+    
+    st << std::put_time(std::gmtime(& myt), "%b %e, "); // month and day
+    string retval = st.str();
+    
+    st.str("");   // Clear the stream.
+    st << std::put_time(std::gmtime(& myt), "%Y\n");
+    string syear = st.str();
+    int year = stoi(syear) - 1970 + starting_year;   // Changing the epoch
+    retval += to_string(year);
+
+    return retval;
+}
+
+
 string read_uFloat(ifstream &in) {
     int raw = read_int(in);
     return to_string(double(raw)/1000000);
@@ -619,10 +753,10 @@ void unpack_section (section section, ifstream & in, ofstream & out, int offset)
         string translation;
            
         if (line_decode.count(subsection_x)) {
-            translation = translate(line_decode.at(subsection_x).t, value);
+            translation = translate(line_decode.at(subsection_x).t, value, subsection);
         }
         if (line_decode.count(subsection)) {
-            translation = translate(line_decode.at(subsection).t, value);
+            translation = translate(line_decode.at(subsection).t, value, subsection);
         }
         
         string comment;
@@ -633,9 +767,15 @@ void unpack_section (section section, ifstream & in, ofstream & out, int offset)
             comment = line_decode.at(subsection).comment;
         }
         
+        // Fix this.
         int linesize = bytes_per_line;
         if (method==TEXT0) { linesize = 0;}
         if (method==TEXT8) { linesize = 8;}
+        
+        //
+        if (subsection == "Personal_0") {
+            store_startingyear(in);
+        }
         
         out << subsection << "   : " << char_for_method.at(method) << to_string(linesize);
         out << "   :   " << value << "   :   " << comment << " " << translation << "\n";
