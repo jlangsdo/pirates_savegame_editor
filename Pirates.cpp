@@ -24,9 +24,7 @@
 using namespace std;
 
 int index_from_linecode (string line_code);
-
-const vector<string> specialists = {
-    "cook", "quartermaster", "navigator", "surgeon", "gunner", "cooper", "sailmaker", "carpenter" };
+const int number_of_true_cities = 44;
 
 //
 enum translation_type { TEXT0, TEXT8, HEX, INT, BINARY, SHORT, CHAR, mFLOAT, uFLOAT, MAP, BULK, ZERO };
@@ -45,11 +43,12 @@ const map<translation_type,char> size_for_method = {
 enum translatable {
     // All translatable enums should be mapped in the translation_lists
     NIL, RANK, DIFFICULTY, NATION, FLAG, SKILL, SPECIAL_MOVE, SHIP_TYPE,
-    DISPOSITION, BEAUTY, UPGRADES, CITYNAME, DIRECTION,
-    WEALTH_CLASS, POPULATION_CLASS, SOLDIERS, FLAG_TYPE,
+    DISPOSITION, BEAUTY, SHORT_UPGRADES, LONG_UPGRADES, CITYNAME, DIRECTION,
+    SHORT_DIRECTION,
+    WEALTH_CLASS, POPULATION_CLASS, SOLDIERS, FLAG_TYPE, SPECIALISTS,
     // or in the translation_functions
     DIR, SHIPNAME, STORE_CITYNAME, DATE, FOLLOWING, SPECIALIST, CITY_BY_LINECODE, WEALTH, POPULATION,
-    POPULATION_TYPE,
+    POPULATION_TYPE, ACRES, LUXURIES_AND_SPICES, BEAUTY_AND_SHIPWRIGHT
 };
 
 map <translatable, vector<string>> translation_lists = {
@@ -71,12 +70,19 @@ map <translatable, vector<string>> translation_lists = {
     
     { DISPOSITION, { "", "pirate hunter", "privateer", "raider", "smuggler", "?", "escort"}},
     { BEAUTY, {"rather plain", "attractive", "beautiful"}},
-    { UPGRADES, {"copper plating", "cotton sails", "triple hammocks", "iron scantlings",
+    { SHORT_UPGRADES, {
+        "copper",                "sails",        "hammocks",      "scantlings",
+        "chain",      "grape",                 "powder", "bronze"}},
+    { LONG_UPGRADES, {
+        "copper plating", "cotton sails", "triple hammocks", "iron scantlings",
         "chain shot", "grape shot", "fine grain powder", "bronze cannon"}},
     { DIRECTION, {"N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW", "N"}},
+    { SHORT_DIRECTION, {"N", "NE", "E", "SE", "S", "SW", "W", "NW", "N"}},
     // CITYNAME is loaded during the reading of the CityName section, for use in other sections like Ship.
     { WEALTH_CLASS, {"quiet and desolate", "baking in the sun", "bustling with activity","clean and prosperous", "brimming with wealth",}},
     { POPULATION_CLASS, {"Farmers", "Colonists",  "Craftsmen", "Landowners", "Citizens","Merchants"}},
+    { SPECIALISTS, {"carpenter", "sailmaker", "cooper", "gunner", "surgeon", "navigator", "quartermaster", "cook"}},
+
 };
 
 string translate_dir (string value, string line_code);
@@ -92,8 +98,19 @@ string translate_soldiers(string value, string line_code) {
     if (as_int > 0) { return to_string(as_int*20);}
     else { return "None";}
 }
+string translate_acres(string value, string line_code) {
+    return to_string(50*stol(value)) + " acres";
+    
+}
+string translate_luxuries_and_spices(string value, string line_code) {
+    long as_int = stol(value)/2;
+    if (as_int > 49) { as_int = 49;}
+    if (as_int == 0) { return ""; }
+    return to_string(as_int);
+}
+
 string translate_population(string value, string line_code) {
-    return to_string( 200 * stoi(value));
+    return to_string( 200 * stol(value));
 }
 
 string translate_following(string value, string line_code) {
@@ -108,6 +125,7 @@ string store_cityname (string value, string line_code) {
 }
 
 string store_flag(string value, string line_code);
+string translate_beauty_and_shipwright(string value, string line_code);
 
 // Translations that require special effort or which are called to store data.
 map <translatable, string (*)(string, string)> translation_functions = {
@@ -123,6 +141,10 @@ map <translatable, string (*)(string, string)> translation_functions = {
     { SOLDIERS, translate_soldiers},
     { POPULATION, translate_population},
     { WEALTH, translate_wealth},
+    { LUXURIES_AND_SPICES, translate_luxuries_and_spices},
+    { BEAUTY_AND_SHIPWRIGHT, translate_beauty_and_shipwright},
+    { POPULATION_TYPE, translate_population_type},
+    { ACRES, translate_acres},
 };
 
 
@@ -137,10 +159,9 @@ int read_hex (char c) { // Reads a char ascii value, returns digital equivalent 
 }
 
 
-string simple_translate (translatable t, string value) {
+string simple_translate (translatable t, int as_int) {
     if (translation_lists.count(t)) {
         // Simple translation from a list.
-        int as_int = stoi(value);
         vector<string> list = translation_lists.at(t);
         if (as_int >= 0 && as_int < list.size()) {
             if (list.at(as_int).size() > 0) {
@@ -153,6 +174,9 @@ string simple_translate (translatable t, string value) {
     }
     return "";
 }
+string simple_translate (translatable t, string value) {    return simple_translate(t, (int)stol(value)); }
+
+
 
 string translate(translatable t, string value, string line_code) {
     if (t == NIL) { return ""; }
@@ -191,12 +215,28 @@ string store_flag(string value, string line_code){
 vector<int> stored_city_wealth (128);
 string translate_wealth(string value, string line_code) {
     int index = index_from_linecode(line_code);
-    int wealth = stoi(value);
+    int wealth = (int)stol(value);    // Again, problem may be that INT should be signed.
     stored_city_wealth[index] = wealth;
     
     if (wealth != 300 ) {
-        return simple_translate(WEALTH_CLASS, to_string(wealth/40) );
+        return simple_translate(WEALTH_CLASS, wealth/40 );
     } else { return ""; }
+}
+
+string translate_population_type (string value, string line_code) {
+    // Cities are classified as having different sorts of population as a combination
+    // of the Economy CityInfo_x_0_4 and the wealth City_x_5
+    
+    int magic_number = (int)translation_lists[POPULATION_CLASS].size() /2; // == 3
+    
+    int index = index_from_linecode(line_code);
+    if (index >= number_of_true_cities) { return ""; } // Settlements do not get this
+    
+    long pop_group = stol(value)/67;
+    if (pop_group >= magic_number) { pop_group = magic_number-1;} // TODO I think the real problem is that INT should be signed.
+    int is_wealthy = (stored_city_wealth[index] > 100) ? 1:0;
+    
+    return simple_translate(POPULATION_CLASS, (int)pop_group + magic_number*is_wealthy);
 }
 
 string translate_dir (string value, string line_code) {
@@ -207,8 +247,7 @@ string translate_dir (string value, string line_code) {
     int next_digit = read_hex(second_char);
     if (next_digit > 7) { dir++; }
     
-    return simple_translate(DIRECTION, to_string(dir));
-    
+    return simple_translate(DIRECTION, dir);
 }
 
 int index_from_linecode (string line_code) { // Given Ship_23_1_4, returns 23
@@ -219,7 +258,7 @@ int index_from_linecode (string line_code) { // Given Ship_23_1_4, returns 23
 
 string translate_city_by_linecode (string value, string line_code) { // In this case, we aren't translating the value,
     int index = index_from_linecode(line_code);           // but rather noting which cityname goes with this line_code.
-    return simple_translate(CITYNAME, to_string(index));
+    return simple_translate(CITYNAME, index);
 }
 
 string translate_specialist (string value, string line_code) {
@@ -227,9 +266,18 @@ string translate_specialist (string value, string line_code) {
     // and which specialist it is depends on the ship number.
     if (value != "10") { return ""; }
     int index = index_from_linecode(line_code);
-    return  specialists[7 - (index % 8) ] + " on board";
+    return simple_translate(SPECIALISTS, index%8) + " on board";
 }
 
+string translate_beauty_and_shipwright(string value, string line_code) {
+    int city_index = index_from_linecode(line_code);
+    int city_value = (stoi(value)+city_index)%8;
+    string retval = "Shipwright can provide " + simple_translate(LONG_UPGRADES, city_value);
+    if (city_index < number_of_true_cities) { // Only main cities also have a governor's daughter.
+        retval = "Daughter is " + simple_translate(BEAUTY, value) + ", and " + retval;
+    }
+    return retval;
+}
 
 struct decode_for_line {
     string comment = "";
@@ -282,7 +330,7 @@ map<string,decode_for_line> line_decode = {
     {"Ship_x_2_2", {"",                 FOLLOWING  }},
     {"Ship_x_2_3", {"Crew aboard"}},
     {"Ship_x_2_4", {"Cannon aboard"}},
-    {"Ship_x_2_6_0", {"upgrades bronze/powder/grape/chain/scantlings/hammocks/sails/copper"}},
+    // {"Ship_x_2_6_0", {"upgrades bronze/powder/grape/chain/scantlings/hammocks/sails/copper"}}, // do this automatically below
     {"Ship_x_2_7", {"Name code",        SHIPNAME  }},//
     {"Ship_x_3_0", {"Gold aboard"}},
     {"Ship_x_3_1", {"Food aboard"}},
@@ -314,6 +362,28 @@ map<string,decode_for_line> line_decode = {
      // The value is the same for all savegames. Probably a target city class.
     {"City_x_5",   { "Wealth",    WEALTH}},
     {"City_x_6",   {"Type",       FLAG_TYPE}},
+    {"CityInfo_x_0_3_0", {"Popularity"}},
+    {"CityInfo_x_0_3_1", {"Unpopularity"}},
+    {"CityInfo_x_0_8", {"Land Grant", ACRES}},
+    {"CityInfo_x_0_1", {"", BEAUTY_AND_SHIPWRIGHT}},
+    {"CityInfo_x_0_2_0", {"Hearts"}},
+    {"CityInfo_x_0_4", {"Economy (0-200)", POPULATION_TYPE}},
+    {"CityInfo_x_0_5", {"Mayor Delivered"}},
+    {"CityInfo_x_1_0", {"3x Merchant's gold on hand", }},
+    {"CityInfo_x_1_2", {"Merchant's Food on hand",}},
+    {"CityInfo_x_1_3", {"Merchant's Luxuries on hand", LUXURIES_AND_SPICES}},
+    {"CityInfo_x_1_4", {"Merchant's Goods on hand"}},
+    {"CityInfo_x_1_5", {"Merchant's Spice on hand",    LUXURIES_AND_SPICES}},
+    {"CityInfo_x_1_6", {"Merchant's Sugar on hand"}},
+    {"CityInfo_x_1_10", {"World Map price of Food"}},
+    {"CityInfo_x_1_11", {"World Map price of Luxuries"}},
+    {"CityInfo_x_1_12", {"World Map price of Goods"}},
+    {"CityInfo_x_1_13", {"World Map price of Spice"}},
+    {"CityInfo_x_1_14", {"World Map price of Sugar"}},
+    {"CityInfo_x_1_15", {"World Map price of Cannon"}},
+    {"CityInfo_x_1_16", {"Recruitable Crew Baseline", CITY_BY_LINECODE}},
+    {"CityInfo_x_3_11", {"ship launch direction 0-7", SHORT_DIRECTION}},
+    {"CityInfo_x_4", {"", CITY_BY_LINECODE}},
 
 };
 
@@ -330,6 +400,12 @@ struct section {
 
 // Main description of contents and size of each section, in order.
 //    sections with single letter names are generally not understood.
+//
+// Sections will then be broken up further and further, recurvively. There are two key rules
+//   1. Dewey Decimal Rule: You can break up a section into subsections, as long as their bytes add up to that of the parent.
+//                          This allows more translation of bytes within a subsection without renumbering any other sections.
+//   2. Backward Compatible: The pst file gives enough information about each line to restore the pirates_savegame file,
+//                           even if the pst decoding has changed.
 //
 const vector<section> section_vector = {
     {"Intro",             6,       4,  INT },
@@ -370,9 +446,9 @@ struct subsection_info {
     int multiplier=1;
 };
 
-// Split up a line into multiple lines of identically sized smaller types.
-// The size of the new translation_type should divide evenly into the
-// original line size.
+// Split up a section into multiple lines of identically sized smaller types, assuming that they will
+// use the default byte counts for that type.
+// The size of the new translation_type should divide evenly into the original line size (this is checked at runtime)
 map<string,translation_type> subsection_simple_decode = {
     {"Intro_0",       TEXT0},
     {"Intro_3",       HEX},
@@ -397,10 +473,14 @@ map<string,translation_type> subsection_simple_decode = {
     {"City_x_2",      BINARY},
     {"City_x_4",      BULK},
     {"City_x_7",      BULK},
+    {"CityInfo_x_0_2", SHORT},
+    {"CityInfo_x_0_3", SHORT},
+    {"CityInfo_x_3",   SHORT},
 };
 
-// split up a section into multiple sections that may be of different types and sizes.
-// Make sure the bytes add up to the size of the original section.
+// split up a section into multiple sections that may be of different or variable types and sizes.
+// Make sure the bytes add up to the size of the original section (this is checked at runtime).
+//
 map<string,vector<subsection_info>> subsection_manual_decode = {
     {"Personal_51",   {{CHAR}, {ZERO,3}}},           // 4 = 1+3
     {"Personal_52",   {{BINARY}, {BULK,3}}},         // 4 = 1+3
@@ -411,6 +491,9 @@ map<string,vector<subsection_info>> subsection_manual_decode = {
     {"Ship_x_4",      {{SHORT,2,4}, {INT,4,1}, {ZERO,0,1}, {SHORT,2,2}}},   // 16 = 2*4+4+0+2*2
     {"f_x",           {{BULK,2}, {ZERO,98}, {BULK,2}, {ZERO, 1014}}},   // 2+98+2+1014 = 1116
     {"City_x_3",      {{CHAR,1,3}, {BULK,1}}},       // 4 = 3+1. Calling it BULK to match perl. Nonstandard BULK size.
+    {"CityInfo_x",    {{BULK, 36}, {BULK, 48}, {BULK, 28}, {BULK, 32}, {BULK,4}}}, // 148 = 36+48+28+32+4
+    {"CityInfo_x_0",  {{BULK}, {INT,4,4}, {BULK,4,3}, {INT}}},    //  36 = 4*(1+4+3+1)
+    {"CityInfo_x_1",  {{INT}, {BULK}, {INT,4,5}, {SHORT,2,10}}},               //  48 = 4*(1+1+5)+2*10;
 };
 
 // The zero length zero string for Ship_x_4_5 happened because two adjacent shorts were switched
@@ -438,6 +521,17 @@ const string items[] = {
 };
 
 
+void augment_from_translation_list(translatable t, string line_code, string prefix = "", string delimiter = "/") {
+    // Upgrade and Specialist lists are accessed in the translation_lists because they can appear in decodes.
+    // BUT they also appear in a binary decode where I need to see all of them in a line in reverse order.
+    string sp = "";
+    for (auto up : translation_lists.at(t)) {
+        sp = delimiter + up + sp;
+    }
+    sp = regex_replace(sp,regex("^" + delimiter), prefix);
+    line_decode[line_code] = {sp};
+}
+
 void augment_decoder_groups() {
     // The items need comments in the decoder group that are all the same,
     // so I'm adding these programmatically. This is sort of like a translation function,
@@ -456,14 +550,8 @@ void augment_decoder_groups() {
         line_decode[line] = {comment};
     }
     
-    
-    // The list of specialists is also needed in the translate_specialist routine.
-    string sp = "";
-    for (auto specialist : specialists) {
-        sp += specialist + "/";
-    }
-    sp = regex_replace(sp, regex("/$"), "");
-    line_decode["Personal_52_0"] = {sp};
+    augment_from_translation_list(SPECIALISTS, "Personal_52_0");
+    augment_from_translation_list(SHORT_UPGRADES, "Ship_x_2_6_0", "upgrades ");
 }
 
 string find_file(string dir, string file, string suffix) {
