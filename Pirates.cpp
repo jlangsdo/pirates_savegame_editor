@@ -15,6 +15,7 @@
 #include <map>
 #include <optional>
 #include <vector>
+#include "ship_names.hpp"
 using namespace std;
 
 
@@ -38,7 +39,7 @@ enum translatable {
     NIL, RANK, DIFFICULTY, NATION, FLAG, SKILL, SPECIAL_MOVE, SHIP_TYPE,
     DISPOSITION, BEAUTY, UPGRADES, CITYNAME, DIRECTION,
     // or in the translation_functions
-    DIR,
+    DIR, SHIPNAME, STORE_CITYNAME,
 };
 
 map <translatable, vector<string>> translation_lists = {
@@ -67,10 +68,23 @@ map <translatable, vector<string>> translation_lists = {
 
 string translate_dir (string value);
 
+string store_cityname (string value) {
+    // Save names of cities for later translations.
+    translation_lists[CITYNAME].push_back(value);
+    return "";
+}
+
+string store_flag(string value);
+
 // Translations that require special effort or which are called to store data.
 map <translatable, string (*)(string)> translation_functions = {
-    { DIR, translate_dir }
+    { DIR, translate_dir },
+    { STORE_CITYNAME, store_cityname },
+    { FLAG, store_flag },
+    { SHIP_TYPE, save_last_shiptype },
+    { SHIPNAME, translate_shipname },
 };
+
 
 int read_hex (char c) { // Reads a char ascii value, returns digital equivalent when read as hex.
     int res = (int)(c-'0');
@@ -83,14 +97,7 @@ int read_hex (char c) { // Reads a char ascii value, returns digital equivalent 
 }
 
 
-string translate(translatable t, string value) {
-    if (t == NIL) { return ""; }
-    
-    if (t == CITYNAME) {
-        // Just for the breakpoint.
-        
-    }
-    
+string simple_translate (translatable t, string value) {
     if (translation_lists.count(t)) {
         // Simple translation from a list.
         int as_int = stoi(value);
@@ -103,12 +110,41 @@ string translate(translatable t, string value) {
             // For backward compatability to perl version of this code.
             return "(NIL)";
         }
-    } else if (translation_functions.count(t)) {
-        // Special translations that require their own functions.
-        return translation_functions.at(t)(value);
-    } else {
-        throw logic_error("Problem with translation of translatable " + to_string(t));
     }
+    return "";
+}
+
+string translate(translatable t, string value) {
+    if (t == NIL) { return ""; }
+    
+    string return_value = "";
+    
+    if (translation_functions.count(t)) {
+        // Special translations that require their own functions,
+        // or which store this data for future translations.
+        return_value = translation_functions.at(t)(value);
+    }
+    
+    if (translation_lists.count(t)) {
+        return_value = simple_translate(t, value);
+    }
+    
+    // Placeholders are allowed, so a translatable that doesn't show up in either map is OK.
+    // TODO: Eventually this might want to be an error.
+    
+    // Note that if a translatable has both a function and a simple list, then we call the function
+    // first and then return the value from the list. This is to cover the common case where the function
+    // is for storing the value somewhere.
+    
+    return return_value;
+}
+
+
+string store_flag(string value){
+    string myflag = simple_translate(FLAG, value);
+    myflag = regex_replace(myflag, regex("[\\(\\)]"),"");
+    save_last_flag(myflag);
+    return "";
 }
 
 string translate_dir (string value) {
@@ -130,11 +166,14 @@ struct decode_for_line {
     string comment = "";
     translatable t = NIL;
 };
+
+// These do not have to be in the order that they are in the file, but it makes things easier to read if they are.
 map<string,decode_for_line> line_decode = {
     {"Intro_1",        {"You are here x"}},
     {"Intro_2",        {"You are here y"}},
     {"Intro_4",        {"Difficulty", DIFFICULTY}},
     {"Intro_5",        {"Last city visited"}}, // TODO: Update this message to be more clear
+    {"CityName_x",     {"", STORE_CITYNAME}},
     {"Personal_2_0",   {"on land/marching perspective/0/0/0/not in battle or city/0/0"}},
     {"Personal_5_0",   {"Spanish Attitude"}},
     {"Personal_5_1",   {"English Attitude"}},
@@ -175,15 +214,15 @@ map<string,decode_for_line> line_decode = {
     {"Ship_x_2_3", {"Crew aboard"}},
     {"Ship_x_2_4", {"Cannon aboard"}},
     {"Ship_x_2_6_0", {"upgrades bronze/powder/grape/chain/scantlings/hammocks/sails/copper"}},
-    {"Ship_x_2_7", {"Name code",          }},//     translate_shipname}},
+    {"Ship_x_2_7", {"Name code",        SHIPNAME  }},//
     {"Ship_x_3_0", {"Gold aboard"}},
     {"Ship_x_3_1", {"Food aboard"}},
     {"Ship_x_3_2", {"Luxuries aboard"}},
     {"Ship_x_3_3", {"Goods aboard"}},
     {"Ship_x_3_4", {"Spice aboard"}},
     {"Ship_x_3_5", {"Sugar aboard"}},
-    {"Ship_x_3_7", {"Starting city",       CITYNAME }},//    translate_city}},
-    {"Ship_x_4_0", {"Destination city",    CITYNAME }},//    translate_city}},
+    {"Ship_x_3_7", {"Starting city",       CITYNAME }},
+    {"Ship_x_4_0", {"Destination city",    CITYNAME }},
     {"Ship_x_4_4", {"DateStamp",           }},//    translate_date}},
     {"Ship_x_4_7", {"sails"}},
     {"Ship_x_1_3", {"roll"}},
@@ -600,12 +639,7 @@ void unpack_section (section section, ifstream & in, ofstream & out, int offset)
         
         out << subsection << "   : " << char_for_method.at(method) << to_string(linesize);
         out << "   :   " << value << "   :   " << comment << " " << translation << "\n";
-        
-        // Save these for later translations.
-        if (section.name == "CityName") {
-            translation_lists[CITYNAME].push_back(value);
-        }
-        
+    
     }
     
 }

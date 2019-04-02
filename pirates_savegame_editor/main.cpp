@@ -11,6 +11,8 @@
 #include <getopt.h>
 #include <regex>
 #include "Pirates.hpp"
+#include "ship_names.hpp"
+
 using namespace std;
 
 const string usage = R"USAGE(
@@ -59,7 +61,8 @@ int main(int argc, char **argv)
     
     // Get the pirates module ready to go.
     augment_decoder_groups();
-   
+    load_pirate_shipnames();
+    
     while (1) {
         int option_index = 0;
         c = getopt_long_only (argc, argv, "", long_options, &option_index);

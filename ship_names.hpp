@@ -11,27 +11,26 @@
 
 #include <stdio.h>
 #include <vector>
-
+#include <map>
+#include <string>
 void load_pirate_shipnames();
+
 std::string translate_shipname(std::string value);
 std::string save_last_flag(std::string value);
 std::string save_last_shiptype(std::string value);
 
-
-enum shipname_types { MERCHANT, WARSHIP,  PIRATE};
-
-const std::vector<shipname_types> shipname_type_by_class = {
-    MERCHANT, PIRATE,   WARSHIP,
-    MERCHANT, MERCHANT, MERCHANT,
-    WARSHIP,  WARSHIP,  MERCHANT,
+const std::vector<std::string> shipname_type_by_class = {
+    "MERCHANT SHIPS", "PIRATES",        "WARSHIPS",
+    "MERCHANT SHIPS", "MERCHANT SHIPS", "MERCHANT SHIPS",
+    "WARSHIPS",       "WARSHIPS",       "MERCHANT SHIPS",
     
-    MERCHANT, WARSHIP,  WARSHIP,
-    MERCHANT, MERCHANT, MERCHANT,
-    WARSHIP,  WARSHIP,  MERCHANT,
+    "MERCHANT SHIPS", "WARSHIPS",       "WARSHIPS",
+    "MERCHANT SHIPS", "MERCHANT SHIPS", "MERCHANT SHIPS",
+    "WARSHIPS",       "WARSHIPS",       "MERCHANT SHIPS",
     
-    MERCHANT, WARSHIP,  WARSHIP,
-    MERCHANT, MERCHANT, MERCHANT,
-    WARSHIP,  WARSHIP,  MERCHANT
+    "MERCHANT SHIPS", "WARSHIPS",       "WARSHIPS",
+    "MERCHANT SHIPS", "MERCHANT SHIPS", "MERCHANT SHIPS",
+    "WARSHIPS",       "WARSHIPS",       "MERCHANT SHIPS"
 };
 
 #endif /* ship_names_hpp */
