@@ -27,17 +27,17 @@ int index_from_linecode (string line_code);
 const int number_of_true_cities = 44;
 
 //
-enum translation_type { TEXT0, TEXT8, HEX, INT, BINARY, SHORT, CHAR, mFLOAT, uFLOAT, MAP, BULK, ZERO };
+enum translation_type { TEXT0, TEXT8, HEX, INT, BINARY, SHORT, CHAR, LCHAR, mFLOAT, uFLOAT, MAP, BULK, ZERO };
 
 // The translation types have one character abbreviations in the pst file.
 const map<translation_type,char> char_for_method = {
     {TEXT0,'t'}, {TEXT8,'t'}, {INT, 'V'}, {HEX, 'h'}, {BINARY, 'B'}, {SHORT, 's'}, {CHAR, 'C'}, {MAP, 'm'}, {BULK, 'H'},
-    {ZERO,'x'}, {uFLOAT,'G'},
+    {ZERO,'x'}, {uFLOAT,'G'}, {LCHAR, 'c'},
 };
 
 const map<translation_type,char> size_for_method = {
     {TEXT0,0}, {TEXT8,8}, {INT,4}, {HEX,4}, {BINARY,1}, {SHORT,2}, {CHAR,1}, {MAP,291}, {ZERO,0},
-    {uFLOAT,4}, {BULK, 4},
+    {uFLOAT,4}, {BULK, 4}, {LCHAR, 1},
 };
 
 enum translatable {
@@ -45,16 +45,18 @@ enum translatable {
     NIL, RANK, DIFFICULTY, NATION, FLAG, SKILL, SPECIAL_MOVE, SHIP_TYPE,
     DISPOSITION, BEAUTY, SHORT_UPGRADES, LONG_UPGRADES, CITYNAME, DIRECTION,
     SHORT_DIRECTION,
-    WEALTH_CLASS, POPULATION_CLASS, SOLDIERS, FLAG_TYPE, SPECIALISTS,
+    EVENT, EVENTS3, EVENTS15, EVENTS32, EVENTS64,
+    WEALTH_CLASS, POPULATION_CLASS, SOLDIERS, FLAG_TYPE, SPECIALIST,
     // or in the translation_functions
-    DIR, SHIPNAME, STORE_CITYNAME, DATE, FOLLOWING, SPECIALIST, CITY_BY_LINECODE, WEALTH, POPULATION,
-    POPULATION_TYPE, ACRES, LUXURIES_AND_SPICES, BEAUTY_AND_SHIPWRIGHT
+    DIR, SHIPNAME, STORE_CITYNAME, DATE, FOLLOWING, CITY_BY_LINECODE, WEALTH, POPULATION,
+    POPULATION_TYPE, ACRES, LUXURIES_AND_SPICES, BEAUTY_AND_SHIPWRIGHT, FURTHER_EVENT, SHIP_SPECIALIST,
+    // but if it is not mapped in either, that is not an error (it is hook for future code).
 };
 
 map <translatable, vector<string>> translation_lists = {
     { RANK,
         { "No Rank", "Letter_of_Marque", "Captain", "Major", "Colonel",
-        "Admiral", "Baron", "Count", "Marquis", "Duke"}},
+            "Admiral", "Baron", "Count", "Marquis", "Duke"}},
     { DIFFICULTY,
         { "Apprentice", "Journeyman", "Adventurer", "Rogue", "Swashbuckler" }},
     { NATION, { "Spanish", "English", "French", "Dutch"}},
@@ -81,13 +83,21 @@ map <translatable, vector<string>> translation_lists = {
     // CITYNAME is loaded during the reading of the CityName section, for use in other sections like Ship.
     { WEALTH_CLASS, {"quiet and desolate", "baking in the sun", "bustling with activity","clean and prosperous", "brimming with wealth",}},
     { POPULATION_CLASS, {"Farmers", "Colonists",  "Craftsmen", "Landowners", "Citizens","Merchants"}},
-    { SPECIALISTS, {"carpenter", "sailmaker", "cooper", "gunner", "surgeon", "navigator", "quartermaster", "cook"}},
-
+    { SPECIALIST, {"carpenter", "sailmaker", "cooper", "gunner", "surgeon", "navigator", "quartermaster", "cook"}},
+    { EVENTS3,  {"Immigrants are flocking to", "Malaria strikes", "Governor sailing to",
+        "Pirates attack", "captures city of","Healthy sugar crop in", "Indians attack", "Reinforcements arrive in"}},
+    { EVENTS15, {"Pirate hunter sails from", "War between", "No longer war between", "Sign peace treaty",
+        "Cancelled peace treaty", "", "settlement captured by"}},
+    { EVENTS32, {"Engaged Ship", "Captured Ship", "Sank Ship", "Visited", "Promoted", "Acquired", "Recruited a skilled",
+        "Captured wanted criminal in", "Met Governor's daughter", "Dueled daughter's jealous suitor in", "", "", "Found Pirate Treasure",
+        "", "","sacked/installed governor", "Defeated notorious pirate", "Marooned on a desert island", "", "Vanquished the Marquis Montalban"}},
+    { EVENTS64, {"Treasure fleet headed for","","smuggler sighted", "", "Evil character seen in", "Wanted criminal hiding in" }},
+    { EVENT, vector<string> (70)},
 };
 
 string translate_dir (string value, string line_code);
 string translate_date (string value, string line_code);
-string translate_specialist (string value, string line_code);
+string translate_ship_specialist (string value, string line_code);
 string translate_city_by_linecode(string value, string line_code);
 string translate_wealth(string value, string line_code);
 string translate_population_type(string value, string line_code);
@@ -125,6 +135,7 @@ string store_cityname (string value, string line_code) {
 }
 
 string store_flag(string value, string line_code);
+string translate_event(string value, string line_code);
 string translate_beauty_and_shipwright(string value, string line_code);
 
 // Translations that require special effort or which are called to store data.
@@ -136,7 +147,7 @@ map <translatable, string (*)(string, string)> translation_functions = {
     { SHIPNAME, translate_shipname },
     { DATE, translate_date },
     { FOLLOWING, translate_following },
-    { SPECIALIST, translate_specialist },
+    { SHIP_SPECIALIST, translate_ship_specialist },
     { CITY_BY_LINECODE, translate_city_by_linecode},
     { SOLDIERS, translate_soldiers},
     { POPULATION, translate_population},
@@ -145,6 +156,8 @@ map <translatable, string (*)(string, string)> translation_functions = {
     { BEAUTY_AND_SHIPWRIGHT, translate_beauty_and_shipwright},
     { POPULATION_TYPE, translate_population_type},
     { ACRES, translate_acres},
+    { EVENT, translate_event},
+    { FURTHER_EVENT, translate_event},
 };
 
 
@@ -154,7 +167,7 @@ int read_hex (char c) { // Reads a char ascii value, returns digital equivalent 
     
     res = (int)(c-'A'+10);
     if (res >=10 && res <=15) { return res;}
-   
+    
     throw out_of_range("Bad digit conversion to hex for " + to_string(c));
 }
 
@@ -239,6 +252,12 @@ string translate_population_type (string value, string line_code) {
     return simple_translate(POPULATION_CLASS, (int)pop_group + magic_number*is_wealthy);
 }
 
+
+pair<int, int> break_into_two (string value) {
+    long asint = stol(value);
+    return make_pair((asint/16)%16, asint %16);
+}
+
 string translate_dir (string value, string line_code) {
     char first_char = value.at(0);
     char second_char = value.at(1);
@@ -249,6 +268,91 @@ string translate_dir (string value, string line_code) {
     
     return simple_translate(DIRECTION, dir);
 }
+
+string translate_event_flags(string value, string line_code) {
+    std::bitset<8> asbits(value);
+    return asbits.to_string();
+    return "";
+}
+
+int stored_event;
+int subevent;
+string translate_event(string value, string line_code) {
+    auto as_two = break_into_two(value);
+    int index = stoi(regex_replace(line_code,regex(".*_"), ""));
+    switch (index) {
+        case 0:
+            stored_event = stoi(value);
+            subevent = 0;
+            return "";
+        case 1:
+            if (stol(value) != 0) return "Pleased"; // TODO
+            return "";
+        case 4:
+            switch(stored_event) {
+                case 16 : case 17 : case 18 : case 19 :
+                    return simple_translate(FLAG,as_two.first) + " and " + simple_translate(FLAG,as_two.second);
+                case 48:
+                    return "pirate name";
+                case 33:
+                    return simple_translate(SHIP_TYPE, value);
+                case 35: case 15: case 13: case 64:
+                case 5: case 40: case 68: case 10:
+                case 47: case 41: case 6 : case 3 : case 9:
+                    return simple_translate(CITYNAME, value);
+                case 69: case 39:
+                    return "purpose"; // TODO
+                case 36:
+                    return "to " + simple_translate(FLAG,as_two.first)  + " " + simple_translate(RANK,as_two.first);
+                case 38:
+                    return simple_translate(SPECIALIST, value);
+                case 37:
+                    return "item"; // TODO
+                case 44:
+                    return "beloging to ?? "; // TODO
+                case 66:
+                    return simple_translate(FLAG,value);
+                default :
+                    return "";
+            }// end of _4
+            break;
+        case 8 :
+            switch(stored_event) {
+                case 44:
+                    return "worth " + value + " gold";
+                case 37:
+                    if (value == "1") {
+                        return "Upgrade to some item"; // TODO
+                    }
+                    return "";
+                case 36:
+                    return "Governor encouraged plundering of "; // TODO
+                case 66:
+                    return "headed for " + simple_translate(CITYNAME, value);
+                case 68:
+                    return "EVIL";   // todo
+                case 39: case 21: case 69:
+                    return simple_translate(CITYNAME, value);
+                case 47:
+                    if (subevent > 0) { return "--"; }
+                    if (stol(value) < 8) {
+                        return "installed " + simple_translate(FLAG, value) + " governor";
+                    } else { return  "declined to install governor"; }
+                default:
+                    return "";
+            }
+            break;
+        case 9:
+            if (stored_event == 33) {
+                return "Purpose"; // TODO
+            }
+            break;
+        default :
+            return "";
+    }
+    return "";
+}
+
 
 int index_from_linecode (string line_code) { // Given Ship_23_1_4, returns 23
     string line = regex_replace(line_code, regex("^[^_]+_"), "");
@@ -261,12 +365,12 @@ string translate_city_by_linecode (string value, string line_code) { // In this 
     return simple_translate(CITYNAME, index);
 }
 
-string translate_specialist (string value, string line_code) {
+string translate_ship_specialist (string value, string line_code) {
     // If a specialist is on board, then Ship_x_5_5 will be set to 10
     // and which specialist it is depends on the ship number.
     if (value != "10") { return ""; }
     int index = index_from_linecode(line_code);
-    return simple_translate(SPECIALISTS, index%8) + " on board";
+    return simple_translate(SPECIALIST, index%8) + " on board";
 }
 
 string translate_beauty_and_shipwright(string value, string line_code) {
@@ -345,7 +449,7 @@ map<string,decode_for_line> line_decode = {
     {"Ship_x_1_3", {"roll"}},
     {"Ship_x_5_4_0", {"returning/?/?/?/?/?/?/?"}},
     {"Ship_x_5_4_1", {"?/?/?/treasure fleet/?/notable/?/docked"}},
-    {"Ship_x_5_5", {"",                    SPECIALIST }},
+    {"Ship_x_5_5", {"",                    SHIP_SPECIALIST }},
     {"Ship_x_5_6", {"Countdown until leaving port"}},
     {"Ship_x_6_0", {"Battling"}},
     {"Ship_x_6_1", {"Escorted By"}},
@@ -358,33 +462,47 @@ map<string,decode_for_line> line_decode = {
     {"City_x_3_0", {"Flag",        FLAG}},
     {"City_x_3_1", {"Population",  POPULATION}},
     {"City_x_3_2", {"Soldiers",    SOLDIERS}},
-     // "City_x_3_3" is a number from 0..4. The 3 and 4 values are for wealthy spanish capitals.
-     // The value is the same for all savegames. Probably a target city class.
+    // "City_x_3_3" is a number from 0..4. The 3 and 4 values are for wealthy spanish capitals.
+    // The value is the same for all savegames. Probably a target city class.
     {"City_x_5",   { "Wealth",    WEALTH}},
     {"City_x_6",   {"Type",       FLAG_TYPE}},
     {"CityInfo_x_0_3_0", {"Popularity"}},
     {"CityInfo_x_0_3_1", {"Unpopularity"}},
-    {"CityInfo_x_0_8", {"Land Grant", ACRES}},
-    {"CityInfo_x_0_1", {"", BEAUTY_AND_SHIPWRIGHT}},
+    {"CityInfo_x_0_8",   {"Land Grant", ACRES}},
+    {"CityInfo_x_0_1",   {"", BEAUTY_AND_SHIPWRIGHT}},
     {"CityInfo_x_0_2_0", {"Hearts"}},
-    {"CityInfo_x_0_4", {"Economy (0-200)", POPULATION_TYPE}},
-    {"CityInfo_x_0_5", {"Mayor Delivered"}},
-    {"CityInfo_x_1_0", {"3x Merchant's gold on hand", }},
-    {"CityInfo_x_1_2", {"Merchant's Food on hand",}},
-    {"CityInfo_x_1_3", {"Merchant's Luxuries on hand", LUXURIES_AND_SPICES}},
-    {"CityInfo_x_1_4", {"Merchant's Goods on hand"}},
-    {"CityInfo_x_1_5", {"Merchant's Spice on hand",    LUXURIES_AND_SPICES}},
-    {"CityInfo_x_1_6", {"Merchant's Sugar on hand"}},
-    {"CityInfo_x_1_10", {"World Map price of Food"}},
-    {"CityInfo_x_1_11", {"World Map price of Luxuries"}},
-    {"CityInfo_x_1_12", {"World Map price of Goods"}},
-    {"CityInfo_x_1_13", {"World Map price of Spice"}},
-    {"CityInfo_x_1_14", {"World Map price of Sugar"}},
-    {"CityInfo_x_1_15", {"World Map price of Cannon"}},
-    {"CityInfo_x_1_16", {"Recruitable Crew Baseline", CITY_BY_LINECODE}},
-    {"CityInfo_x_3_11", {"ship launch direction 0-7", SHORT_DIRECTION}},
-    {"CityInfo_x_4", {"", CITY_BY_LINECODE}},
-
+    {"CityInfo_x_0_4",   {"Economy (0-200)", POPULATION_TYPE}},
+    {"CityInfo_x_0_5",   {"Mayor Delivered"}},
+    {"CityInfo_x_1_0",   {"3x Merchant's gold on hand", }},
+    {"CityInfo_x_1_2",   {"Merchant's Food on hand",}},
+    {"CityInfo_x_1_3",   {"Merchant's Luxuries on hand", LUXURIES_AND_SPICES}},
+    {"CityInfo_x_1_4",   {"Merchant's Goods on hand"}},
+    {"CityInfo_x_1_5",   {"Merchant's Spice on hand",    LUXURIES_AND_SPICES}},
+    {"CityInfo_x_1_6",   {"Merchant's Sugar on hand"}},
+    {"CityInfo_x_1_10",  {"World Map price of Food"}},
+    {"CityInfo_x_1_11",  {"World Map price of Luxuries"}},
+    {"CityInfo_x_1_12",  {"World Map price of Goods"}},
+    {"CityInfo_x_1_13",  {"World Map price of Spice"}},
+    {"CityInfo_x_1_14",  {"World Map price of Sugar"}},
+    {"CityInfo_x_1_15",  {"World Map price of Cannon"}},
+    {"CityInfo_x_1_16",  {"Recruitable Crew Baseline", CITY_BY_LINECODE}},
+    {"CityInfo_x_3_11",  {"ship launch direction 0-7", SHORT_DIRECTION}},
+    {"CityInfo_x_4",     {"", CITY_BY_LINECODE}},
+    {"Log_x_0",          {"", EVENT}},
+    {"Log_x_1",          {"", FURTHER_EVENT}},
+    {"Log_x_2",          {"", FURTHER_EVENT}},
+    {"Log_x_3",          {"", FURTHER_EVENT}},
+    {"Log_x_4",          {"", FURTHER_EVENT}},
+    {"Log_x_5",          {"", FURTHER_EVENT}},
+    {"Log_x_6",          {"", FURTHER_EVENT}},
+    {"Log_x_7",          {"", FURTHER_EVENT}},
+    {"Log_x_8",          {"", FURTHER_EVENT}},
+    {"Log_x_9",          {"", FURTHER_EVENT}},
+    {"Log_x_10",         {"DateStamp", DATE}},
+    {"Log_x_11",         {"x coordinate"}},
+    {"Log_x_12",         {"y coordinate"}},
+    
+    
 };
 
 
@@ -494,6 +612,7 @@ map<string,vector<subsection_info>> subsection_manual_decode = {
     {"CityInfo_x",    {{BULK, 36}, {BULK, 48}, {BULK, 28}, {BULK, 32}, {BULK,4}}}, // 148 = 36+48+28+32+4
     {"CityInfo_x_0",  {{BULK}, {INT,4,4}, {BULK,4,3}, {INT}}},    //  36 = 4*(1+4+3+1)
     {"CityInfo_x_1",  {{INT}, {BULK}, {INT,4,5}, {SHORT,2,10}}},               //  48 = 4*(1+1+5)+2*10;
+    {"Log_x",         {{LCHAR,1,8}, {INT,4,3}, {uFLOAT,4,2} }}, // 28 = 8+4*3+4*2
 };
 
 // The zero length zero string for Ship_x_4_5 happened because two adjacent shorts were switched
@@ -532,6 +651,18 @@ void augment_from_translation_list(translatable t, string line_code, string pref
     line_decode[line_code] = {sp};
 }
 
+void augment_cross_translation_list(translatable to, translatable from, int offset) {
+    // The EVENT translation list would have too many holes, so build it up one part at a time.
+    for (int i=0; i<translation_lists.at(from).size(); i++) {
+        string from_val = translation_lists.at(from)[i];
+        if (from_val != "") {
+            translation_lists[to][i+offset] = from_val;
+            // For debug.
+            // cerr << "Set EVENTS " << i+offset << " to " <<  from_val << "\n";
+        }
+    }
+}
+
 void augment_decoder_groups() {
     // The items need comments in the decoder group that are all the same,
     // so I'm adding these programmatically. This is sort of like a translation function,
@@ -550,8 +681,16 @@ void augment_decoder_groups() {
         line_decode[line] = {comment};
     }
     
-    augment_from_translation_list(SPECIALISTS, "Personal_52_0");
+    // These have lists in the comment where I also need the components of the lists separately.
+    augment_from_translation_list(SPECIALIST, "Personal_52_0");
     augment_from_translation_list(SHORT_UPGRADES, "Ship_x_2_6_0", "upgrades ");
+    
+    // This translation_list has blanks.
+    augment_cross_translation_list(EVENT, EVENTS3, 3);
+    augment_cross_translation_list(EVENT, EVENTS15, 15);
+    augment_cross_translation_list(EVENT, EVENTS32, 32);
+    augment_cross_translation_list(EVENT, EVENTS64, 64);
+    
 }
 
 string find_file(string dir, string file, string suffix) {
@@ -691,7 +830,7 @@ void store_startingyear(ifstream & in) {
 }
 
 string translate_date(string value, string section) { // Translate the datestamp into a date in game time.
-    double stamp = stoi(value);
+    double stamp = stol(value);
     if (stamp == 0 || stamp == -1) { return ""; }
     
     // I have no idea where the 197.2 comes from; in this formula.
@@ -711,7 +850,7 @@ string translate_date(string value, string section) { // Translate the datestamp
     string syear = st.str();
     int year = stoi(syear) - 1970 + starting_year;   // Changing the epoch
     retval += to_string(year);
-
+    
     return retval;
 }
 
@@ -834,12 +973,15 @@ void unpack_section (section section, ifstream & in, ofstream & out, int offset)
             case CHAR :
                 value = read_char(in);
                 break;
+            case LCHAR :
+                value = read_char(in);
+                break;
             default:
                 break;
         }
         
         string translation;
-           
+        
         if (line_decode.count(subsection_x)) {
             translation = translate(line_decode.at(subsection_x).t, value, subsection);
         }
@@ -867,7 +1009,7 @@ void unpack_section (section section, ifstream & in, ofstream & out, int offset)
         
         out << subsection << "   : " << char_for_method.at(method) << to_string(linesize);
         out << "   :   " << value << "   :   " << comment << " " << translation << "\n";
-    
+        
     }
     
 }
