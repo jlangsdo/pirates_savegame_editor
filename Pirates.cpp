@@ -64,10 +64,10 @@ const vector<section> section_vector = {
     {"City",            128,      32, },
     {"CityInfo",        128,     148, },
     {"Log",            1000,      28, },
-    {"j",                 1,       4, },
-    {"e",                30,      32, },
+    {"j",                 1,       4, HEX },
+    {"e",                30,      32, }, // e is really at least 3 parts: unknown, peace_and_war, and date and age.
     {"Quest",            64,      32, },
-    {"LogCount",          1,       4, },
+    {"LogCount",          1,       4, INT},
     {"TopoMap",         462,     586, },
     {"FeatureMap",      462,     293, },
     {"TreasureMap",       4,     328, },
@@ -126,6 +126,9 @@ map<string,translation_type> subsection_simple_decode = {
     {"CityInfo_x_3",   SHORT},
     // {"Log_x_1",   BINARY }   // Pleased/Greatly Pleased
     // {"Log_x_2",   BINARY }   // Offended
+    {"e_x",           INT},
+    {"Quest_x",       INT},
+    {"TreasureMap_x", INT},
 };
 
 // split up a section into multiple sections that may be of different or variable types and sizes.
@@ -144,7 +147,8 @@ map<string,vector<subsection_info>> subsection_manual_decode = {
     {"CityInfo_x",    {{BULK, 36}, {BULK, 48}, {BULK, 28}, {BULK, 32}, {BULK,4}}}, // 148 = 36+48+28+32+4
     {"CityInfo_x_0",  {{BULK}, {INT,4,4}, {BULK,4,3}, {INT}}},    //  36 = 4*(1+4+3+1)
     {"CityInfo_x_1",  {{INT}, {BULK}, {INT,4,5}, {SHORT,2,10}}},               //  48 = 4*(1+1+5)+2*10;
-    {"Log_x",         {{LCHAR,1,8}, {INT,4,3}, {uFLOAT,4,2} }}, // 28 = 8+4*3+4*2
+    {"Log_x",         {{LCHAR,1,8}, {INT,4,3}, {uFLOAT,4,2}}}, // 28 = 8+4*3+4*2
+    {"TreasureMap_x_68", {{BULK,1}, {BINARY,1}, {BULK,1}, {BINARY,1}}}, // 4 = 1+1+1=1
 };
 
 // The zero length zero string for Ship_x_4_5 happened because two adjacent shorts were switched

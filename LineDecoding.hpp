@@ -59,6 +59,9 @@ std::string translate_city_by_linecode (info_for_line_decode) ;
 std::string translate_ship_specialist (info_for_line_decode) ;
 std::string translate_beauty_and_shipwright(info_for_line_decode) ;
 std::string translate_date(info_for_line_decode) ;
+std::string translate_date_and_age(info_for_line_decode) ;
+std::string translate_peace_and_war(info_for_line_decode) ;
+std::string translate_treasure_map(info_for_line_decode) ;
 
 
 #endif /* LineDecoding_hpp */

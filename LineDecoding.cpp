@@ -37,6 +37,7 @@ enum translatable : char {
     // or in the translation_functions
     DIR, SHIPNAME, STORE_CITYNAME, DATE, FOLLOWING, CITY_BY_LINECODE, WEALTH, POPULATION,
     POPULATION_TYPE, ACRES, LUXURIES_AND_SPICES, BEAUTY_AND_SHIPWRIGHT, FURTHER_EVENT, SHIP_SPECIALIST,
+    PEACE_AND_WAR, DATE_AND_AGE, TREASURE_MAP,
     // If it is not mapped in either, that is not an error: it is hook for future code).
 };
 
@@ -130,7 +131,7 @@ map <translatable, vector<string>> translation_lists = {
 // Translations that require special effort or which are called to store data.
 map <translatable, string (*)(info_for_line_decode i)> translation_functions = {
     { SHIPNAME, translate_shipname },
-    { SHIP_TYPE, save_last_shiptype },
+    { SHIP_TYPE, save_last_shiptype }, // Is this really that much better than a switch/case statement?
     { DIR, translate_dir },
     { STORE_CITYNAME, store_cityname },
     { FLAG, store_flag },
@@ -147,6 +148,9 @@ map <translatable, string (*)(info_for_line_decode i)> translation_functions = {
     { ACRES, translate_acres},
     { EVENT, translate_event},
     { FURTHER_EVENT, translate_event},
+    { PEACE_AND_WAR, translate_peace_and_war},
+    { DATE_AND_AGE, translate_date_and_age},
+    { TREASURE_MAP, translate_treasure_map},
 };
 
 
@@ -193,7 +197,7 @@ string simple_translate (translatable t, int as_int) {
             } else { return ""; }
         } else {
             // For backward compatability to perl version of this code.
-            return "NIL";
+            if (t == SHIP_TYPE) return "NIL";
         }
     }
     return "";
@@ -389,6 +393,24 @@ string translate_city_by_linecode (info_for_line_decode i) { // In this case, we
     return simple_translate(CITYNAME, index);
 }
 
+string translate_peace_and_war (info_for_line_decode i) {
+    auto nation1 = index_from_linecode(i.line_code) - 16;
+    if (nation1 < 0 || nation1 > 5) { return "";}
+    auto nation2 = suffix_from_linecode(i.line_code) + 1;
+    string nations = simple_translate(FLAG, nation1) + " and " + simple_translate(FLAG, nation2);
+    if (i.v ==  1) { return nations + " at war"; }
+    if (i.v == -1) { return nations + " at peace"; }
+    return "";
+}
+
+string translate_date_and_age(info_for_line_decode i) {
+    string date = translate_date(i);
+    int age = stoi(regex_replace(date, regex(".* "), "")) - starting_year + 18;
+    return "Approx Date: " + translate_date(i) + "; Age: " + to_string(age);
+}
+string translate_treasure_map(info_for_line_decode i) {
+    return "feature x coord ";
+}
 string translate_ship_specialist (info_for_line_decode i) {
     // If a specialist is on board, then Ship_x_5_5 will be set to 10
     // and which specialist it is depends on the ship number.
@@ -520,6 +542,33 @@ map<string,decode_for_line> line_decode = {
     {"Log_x_10",         {"DateStamp", DATE}},
     {"Log_x_11",         {"x coordinate"}},
     {"Log_x_12",         {"y coordinate"}},
+   // e_1_0 might be a bitstring. 16 for apprentice
+    {"e_x_0",             {"", PEACE_AND_WAR}},    // Hmm, seems like _x_x syntax would be nice too.
+    {"e_x_1",             {"", PEACE_AND_WAR}},
+    {"e_x_2",             {"", PEACE_AND_WAR}},
+    {"e_x_3",             {"", PEACE_AND_WAR}},
+    {"e_x_4",             {"", PEACE_AND_WAR}},
+    {"e_x_5",             {"", PEACE_AND_WAR}},
+    {"e_23_7",            {"Date", DATE_AND_AGE}},
+    {"Quest_x_0",         {"30 for wanted criminal, 10 for escort"}},
+    {"Quest_x_1",         {"City", CITYNAME}},
+    {"Quest_x_2",         {"Ship number of pirate"}},
+    {"Quest_x_3",         {"Ship number to be escorted"}},
+    {"Quest_x_4",         {"DateStamp", DATE}},
+    {"Quest_x_5",         {"Purpose", PURPOSE}},
+    {"LogCount_0",        {"Next Ship's Log Entry"}},
+    {"TreasureMap_x_68_1",{"treasure map missing  SW/SE/NE/NW"}}, // this could be more clear.
+    {"TreasureMap_x_68_3",{"treasure already found"}},
+    {"TreasureMap_x_69",  {"", PIRATE}},
+    {"TreasureMap_x_x",   {"", TREASURE_MAP}},
+    {"TreasureMap_0_0",   {"Pirate Treasure"}},
+    {"TreasureMap_1_0",   {"Lost Relative"}},
+    {"TreasureMap_2_0",   {"Lost City"}},
+    {"TreasureMap_3_0",   {"Montalban's Hideout"}},
+    {"TreasureMap_0_16",  {"Pirate Treasure"}},
+    {"TreasureMap_1_16",  {"Lost Relative"}},
+    {"TreasureMap_2_16",  {"Lost City"}},
+    {"TreasureMap_3_16",  {"Montalban's Hideout"}},
 };
 
 
