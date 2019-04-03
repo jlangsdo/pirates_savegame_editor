@@ -13,11 +13,12 @@
 #include <vector>
 #include <map>
 #include <string>
+#include "LineDecoding.hpp"
 void load_pirate_shipnames();
 
-std::string translate_shipname(std::string value, std::string line_code);
-std::string save_last_flag(std::string value);
-std::string save_last_shiptype(std::string value, std::string line_code);
+std::string translate_shipname(info_for_line_decode);
+void save_last_flag(std::string);
+std::string save_last_shiptype(info_for_line_decode);
 
 const std::vector<std::string> shipname_type_by_class = {
     "MERCHANT SHIPS", "PIRATES",        "WARSHIPS",

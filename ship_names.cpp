@@ -7,6 +7,7 @@
 //
 
 #include "ship_names.hpp"
+#include "LineDecoding.hpp"
 #include <string>
 #include <sstream>
 #include <iostream>
@@ -14,14 +15,11 @@
 using namespace std;
 
 string last_flag = "";
-string save_last_flag(string value) {
-    last_flag = value;
-    return "";
-}
+void save_last_flag(string flag) { last_flag = flag;   }
 
 int last_shiptype = 0;
-string save_last_shiptype(string value, string line_code) {
-    last_shiptype = stoi(value);
+string save_last_shiptype(info_for_line_decode i) {
+    last_shiptype = stoi(i.value);
     return "";
 }
 
@@ -673,6 +671,7 @@ void load_pirate_shipnames() {
     while(getline(data,aline)) {
         if (regex_search(aline, regex("^#"))) {
             shipclass = regex_replace(aline, regex("#"), "");
+            shipnames_list[shipclass] = {};
         } else if (shipclass != "") {
             // Discard gender of ships (, M).
             // That was in the dump for languages other than English.
@@ -685,7 +684,7 @@ void load_pirate_shipnames() {
     }
 }
 
-string translate_shipname(string value, string line_code) {
+string translate_shipname(info_for_line_decode i) {
     if (last_flag == "") { return "NIL"; }
     if (last_shiptype < 0 || last_shiptype > shipname_type_by_class.size()) { return "NIL"; }
 
@@ -700,7 +699,7 @@ string translate_shipname(string value, string line_code) {
     shipname_group = regex_replace(shipname_group, regex("^PIRATES.*"), "ENGLISH PIRATES");
     shipname_group = regex_replace(shipname_group, regex("^INDIAN.*"), "SPANISH MERCHANT SHIPS");
     
-    int as_int = stoi(value);
+    int as_int = stoi(i.value);
     if (shipnames_list.count(shipname_group)) {
         vector<string> & list = shipnames_list.at(shipname_group);
         if (as_int >= 0 && as_int < list.size()) {

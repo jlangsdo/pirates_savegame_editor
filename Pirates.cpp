@@ -124,6 +124,8 @@ map<string,translation_type> subsection_simple_decode = {
     {"CityInfo_x_0_2", SHORT},
     {"CityInfo_x_0_3", SHORT},
     {"CityInfo_x_3",   SHORT},
+    // {"Log_x_1",   BINARY }   // Pleased/Greatly Pleased
+    // {"Log_x_2",   BINARY }   // Offended
 };
 
 // split up a section into multiple sections that may be of different or variable types and sizes.
@@ -264,43 +266,51 @@ string read_short(ifstream &in) { // Read 2 bytes as a signed int and return as 
     return to_string(B);
 }
 
-unsigned int read_int(ifstream & in) { // Read 4 bytes from in (little endian) and convert to integer
+int read_int(ifstream & in) { // Read 4 bytes from in (little endian) and convert to integer
     char b[4];
     in.read((char*)&b, sizeof(b));
-    unsigned int B = (unsigned int)((unsigned char)(b[0]) |
+    int B = (int)((unsigned char)(b[0]) |
                                     (unsigned char)(b[1]) << 8 |
                                     (unsigned char)(b[2]) << 16 |
-                                    (unsigned char)(b[3]) << 24    );
+                                    (char)(b[3]) << 24    );
     return B;
 }
 
 
 string read_uFloat(ifstream &in) {
-    int raw = read_int(in);
+    auto raw = read_int(in);
     return to_string(double(raw)/1000000);
 }
 
-void unpack_section (section section, ifstream & in, ofstream & out, int offset) {
-    for (int c=offset; c<section.count+offset;c++) {
-        string subsection = section.name + "_" + to_string(c);
+void unpack_section (section mysection, ifstream & in, ofstream & out, int offset) {
+    if (mysection.name == "Log") { out << "# Ship's Log\n"; } // hack to match perl.
+    
+    // section: Ship_0_0
+    for (int c=offset; c<mysection.count+offset;c++) {
+        string subsection = mysection.name + "_" + to_string(c);
+        // subsection (could be a line_code)           Ship_0_0_2
         string subsection_x = regex_replace(subsection, regex(R"(^([^_]+)_\d+)"), "$1_x");
+        // subsection_x (could be a generic line_code) Ship_x_0_2
         
-        // The subsection or subsection_x have higher priority in translating this line.
-        // Example:
-        //   subsection   = Ship_0_0_0
-        //   subsection_x = Ship_x_0_0
-        //   section      = Ship_0_0
+        // The subsection or subsection_x have higher priority in translating this line
+        // than the parent section directive.
         
         if (subsection_simple_decode.count(subsection) || subsection_simple_decode.count(subsection_x)) {
             translation_type submeth = subsection_simple_decode.count(subsection) ?
             subsection_simple_decode.at(subsection) : subsection_simple_decode.at(subsection_x);
             
-            if (submeth != section.method) { // Avoids infinite loop.
+            if (submeth != mysection.method) { // Avoids infinite loop.
                 // Take the the section.byte_count and divide
                 // it equally to set up the subsections.
                 int count = 1;
                 if (size_for_method.at(submeth)>0) {
-                    count = section.bytes_per_line/size_for_method.at(submeth);
+                    count = mysection.bytes_per_line/size_for_method.at(submeth);
+                    
+                    if (mysection.bytes_per_line % size_for_method.at(submeth) != 0) {
+                        cerr << "Error decoding line " << subsection << " byte counts are not divisible\n";
+                        out.close();
+                        abort();
+                    }
                 }
                 int suboffset = 0;
                 
@@ -309,7 +319,7 @@ void unpack_section (section section, ifstream & in, ofstream & out, int offset)
                     // we are changing the translation method of this particular line.
                     // So, remove the numeric ending and call it again with the corrected method.
                     // But note the if above to avoid an infinite loop.
-                    subsection = section.name;
+                    subsection = mysection.name;
                     suboffset = c;
                 }
                 
@@ -334,8 +344,8 @@ void unpack_section (section section, ifstream & in, ofstream & out, int offset)
                 suboffset += subinfo.multiplier;
                 byte_count_check += subinfo.multiplier*subinfo.byte_count;
             }
-            if (byte_count_check != section.bytes_per_line) {
-                cerr << "Error decoding line " << subsection << " subsections don't add up: " << byte_count_check << " != " << section.bytes_per_line << "\n";
+            if (byte_count_check != mysection.bytes_per_line) {
+                cerr << "Error decoding line " << subsection << " subsections don't add up: " << byte_count_check << " != " << mysection.bytes_per_line << "\n";
                 out.close();
                 abort();
                 // It will probably crash later anyway.
@@ -343,12 +353,12 @@ void unpack_section (section section, ifstream & in, ofstream & out, int offset)
             continue;
         }
         
-        auto method = section.method;
-        auto bytes_per_line = section.bytes_per_line;
+        auto method = mysection.method;
+        auto bytes_per_line = mysection.bytes_per_line;
         
         string value;
         char buffer[255] = "";
-        unsigned int size_of_string;
+        int size_of_string;
         
         switch (method) {
             case TEXT0 : // Stores a length in chars, followed by the text, possibly followed by 0 padding.
@@ -413,11 +423,16 @@ void unpack_section (section section, ifstream & in, ofstream & out, int offset)
             store_startingyear(in);
         }
         
+        // Matching bug in perl script
+        // -1 -> "4294967295";
+        if (method==INT && stoi(value) < 0) {
+            value = to_string((unsigned int)(stoi(value)));
+        }
+        
         out << subsection << "   : " << char_for_method.at(method) << to_string(linesize);
         out << "   :   " << value << "   :   " << comment << " " << translation << "\n";
         
     }
-    
 }
 
 int starting_year;
@@ -426,6 +441,6 @@ void store_startingyear(ifstream & in) {
     // variable, for use in decoding DateStamps. Then jump right back.
     constexpr int jump_dist = 887272;
     in.seekg(jump_dist, ios_base::cur);
-    starting_year = (int)read_int(in);
+    starting_year = read_int(in);
     in.seekg(-jump_dist-4, ios_base::cur);
 }
