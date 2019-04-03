@@ -414,8 +414,8 @@ void unpack_section (section mysection, ifstream & in, ofstream & out, int offse
                 break;
         }
         
-        string translation = full_translate(subsection, subsection_x, value);
-        string comment = full_comment(subsection, subsection_x, value);
+        string translation = full_translate(subsection, value);
+        string comment = full_comment(subsection, value);
         
         // Fix this.
         int linesize = bytes_per_line;

@@ -28,8 +28,8 @@ struct info_for_line_decode {
 };
 // Master routines
 
-std::string full_translate(std::string subsection, std::string subsection_x, std::string value) ;
-std::string full_comment(std::string subsection, std::string subsection_x, std::string value) ;
+std::string full_translate(std::string subsection, std::string value) ;
+std::string full_comment(std::string subsection, std::string value) ;
 
 std::string translate(translatable t, info_for_line_decode);
 std::string simple_translate (translatable t, int as_int);

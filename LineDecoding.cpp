@@ -27,7 +27,7 @@ extern int starting_year;
 
 enum translatable : char {
     // All translatable enums should be mapped in the translation_lists
-    NIL, RANK, DIFFICULTY, NATION, FLAG, SKILL, SPECIAL_MOVE, SHIP_TYPE,
+    NIL, NONE, RANK, DIFFICULTY, NATION, FLAG, SKILL, SPECIAL_MOVE, SHIP_TYPE,
     DISPOSITION, BEAUTY, SHORT_UPGRADES, LONG_UPGRADES, CITYNAME, DIRECTION,
     SHORT_DIRECTION, PIRATE,
     EVENT, EVENTS3, EVENTS15, EVENTS32, EVENTS64,
@@ -190,7 +190,7 @@ string store_cityname (info_for_line_decode i) {
 string simple_translate (translatable t, int as_int) {
     if (translation_lists.count(t)) {
         // Simple translation from a list.
-        vector<string> list = translation_lists.at(t);
+        vector<string> & list = translation_lists.at(t);
         if (as_int >= 0 && as_int < list.size()) {
             if (list.at(as_int).size() > 0) {
                 return list.at(as_int);
@@ -397,6 +397,7 @@ string translate_peace_and_war (info_for_line_decode i) {
     auto nation1 = index_from_linecode(i.line_code) - 16;
     if (nation1 < 0 || nation1 > 5) { return "";}
     auto nation2 = suffix_from_linecode(i.line_code) + 1;
+    if (nation2 < 0 || nation2 > 5) { return "";}
     string nations = simple_translate(FLAG, nation1) + " and " + simple_translate(FLAG, nation2);
     if (i.v ==  1) { return nations + " at war"; }
     if (i.v == -1) { return nations + " at peace"; }
@@ -409,7 +410,13 @@ string translate_date_and_age(info_for_line_decode i) {
     return "Approx Date: " + translate_date(i) + "; Age: " + to_string(age);
 }
 string translate_treasure_map(info_for_line_decode i) {
-    return "feature x coord ";
+    if (i.v==0 || i.v == -1) { return ""; }
+    auto index = suffix_from_linecode(i.line_code);
+    string retval = "feature";
+    if (index==0 || index == 16) { retval = "";}
+    if (index == 1 || index == 17) { retval = "Key Landmark";}
+    if (index & 16) { retval += " y coord "; } else { retval += " x coord "; }
+    return retval;
 }
 string translate_ship_specialist (info_for_line_decode i) {
     // If a specialist is on board, then Ship_x_5_5 will be set to 10
@@ -530,25 +537,12 @@ map<string,decode_for_line> line_decode = {
     {"CityInfo_x_3_11",  {"ship launch direction 0-7", SHORT_DIRECTION}},
     {"CityInfo_x_4",     {"", CITY_BY_LINECODE}},
     {"Log_x_0",          {"", EVENT}},
-    {"Log_x_1",          {"", FURTHER_EVENT}},
-    {"Log_x_2",          {"", FURTHER_EVENT}},
-    {"Log_x_3",          {"", FURTHER_EVENT}},
-    {"Log_x_4",          {"", FURTHER_EVENT}},
-    {"Log_x_5",          {"", FURTHER_EVENT}},
-    {"Log_x_6",          {"", FURTHER_EVENT}},
-    {"Log_x_7",          {"", FURTHER_EVENT}},
-    {"Log_x_8",          {"", FURTHER_EVENT}},
-    {"Log_x_9",          {"", FURTHER_EVENT}},
+    {"Log_x_x",          {"", FURTHER_EVENT}},
     {"Log_x_10",         {"DateStamp", DATE}},
-    {"Log_x_11",         {"x coordinate"}},
-    {"Log_x_12",         {"y coordinate"}},
+    {"Log_x_11",         {"x coordinate", NONE}},
+    {"Log_x_12",         {"y coordinate", NONE}},
    // e_1_0 might be a bitstring. 16 for apprentice
-    {"e_x_0",             {"", PEACE_AND_WAR}},    // Hmm, seems like _x_x syntax would be nice too.
-    {"e_x_1",             {"", PEACE_AND_WAR}},
-    {"e_x_2",             {"", PEACE_AND_WAR}},
-    {"e_x_3",             {"", PEACE_AND_WAR}},
-    {"e_x_4",             {"", PEACE_AND_WAR}},
-    {"e_x_5",             {"", PEACE_AND_WAR}},
+    {"e_x_x",             {"", PEACE_AND_WAR}},
     {"e_23_7",            {"Date", DATE_AND_AGE}},
     {"Quest_x_0",         {"30 for wanted criminal, 10 for escort"}},
     {"Quest_x_1",         {"City", CITYNAME}},
@@ -651,8 +645,9 @@ string translate_date(info_for_line_decode i) { // Translate the datestamp into 
     return retval;
 }
 
-string full_translate(string subsection, string subsection_x, string value) {
+string full_translate(string line_code, string value) {
     string translation;
+    
     int v = 0;
     try {
         v = stoi(value);   // Most decodes will use v as an integer.
@@ -662,21 +657,29 @@ string full_translate(string subsection, string subsection_x, string value) {
         // Bulk decode that looks like an integer. Don't send a value.
     }
     
-    if (line_decode.count(subsection_x)) {
-        translation = translate(line_decode.at(subsection_x).t, {value, v, subsection});
+    string temp_line_code = line_code;
+    while(true) { // Improved, now handles Log_x_x and we don't need to pass subsection_x.
+        if (line_decode.count(temp_line_code) && line_decode.at(temp_line_code).t != NIL) {
+            return translate(line_decode.at(temp_line_code).t, { value, v, line_code});
+        } else {
+            if (! regex_search(temp_line_code, regex("_\\d"))) { break; }
+            temp_line_code = regex_replace(temp_line_code, regex("_\\d+"), "_x", std::regex_constants::format_first_only);
+        }
     }
-    if (line_decode.count(subsection)) {
-        translation = translate(line_decode.at(subsection).t, {value, v, subsection});
-    }
-    return translation;
+    
+    return "";
 }
-string full_comment(string subsection, string subsection_x, string value) {
-    string comment;
-    if (line_decode.count(subsection_x)) {
-        comment = line_decode.at(subsection_x).comment;
+
+
+string full_comment(string line_code, string value) {
+    string temp_line_code = line_code;
+    while(true) { // Improved, now handles Log_x_x and we don't need to pass subsection_x.
+        if (line_decode.count(temp_line_code)) {
+            return line_decode.at(temp_line_code).comment;
+        } else {
+            if (! regex_search(temp_line_code, regex("_\\d"))) { break; }
+            temp_line_code = regex_replace(temp_line_code, regex("_\\d+"), "_x", std::regex_constants::format_first_only);
+        }
     }
-    if (line_decode.count(subsection)) {
-        comment = line_decode.at(subsection).comment;
-    }
-    return comment;
+    return "";
 }
