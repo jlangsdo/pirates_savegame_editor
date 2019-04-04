@@ -25,6 +25,11 @@ int index_from_linecode (string line_code);
 
 enum translation_type { TEXT0, TEXT8, HEX, INT, BINARY, SHORT, CHAR, LCHAR, mFLOAT, uFLOAT, FMAP, SMAP, CMAP, BULK, ZERO };
 
+bool is_world_map(translation_type m) {
+    // world maps get special handling.
+    return (m==SMAP || m==CMAP || m==FMAP);
+}
+
 // The translation types have one character abbreviations in the pst file.
 const map<translation_type,string> char_for_method = {
     {TEXT0,"t"}, {TEXT8,"t"}, {INT, "V"}, {HEX, "h"}, {BINARY, "B"}, {SHORT, "s"}, {CHAR, "C"}, {FMAP, "M"}, {BULK, "H"},
@@ -41,6 +46,11 @@ struct section {
     int count;                        // i.e. how many lines to divide into
     int bytes_per_line;               // Except for text.
     translation_type method = BULK;    // Decode method for this section.
+};
+
+struct feature {
+    string line_code;                   // world_map features get printed as separate lines
+    unsigned char v;
 };
 
 // Main description of contents and size of each section, in order.
@@ -304,8 +314,8 @@ string read_mFloat(ifstream &in) {
     return retstring;
 }
 
-string read_map(ifstream &in, int bytecount, translation_type m) {
-    char b[600];
+string read_world_map(ifstream &in, int bytecount, translation_type m, string line_code, vector<feature> & features) {
+    unsigned char b[600];
     in.read((char*)&b, bytecount);
     
     vector<bitset<4> > bs(bytecount/4+1, 0);
@@ -318,27 +328,21 @@ string read_map(ifstream &in, int bytecount, translation_type m) {
     for (int i=0; i<bytecount; i++) {
         auto j = i/4;
         auto k = i % 4;
-        if ((m == FMAP || m == SMAP) && b[i] == -1) {
-            bs.at(j)[3-k] = 1;
-        } else if (m==CMAP && b[i] == 9) {
-            bs.at(j)[3-k] = 1;
-        } else if (b[i] == 0 ) {
-            bs.at(j)[3-k] = 0;
+        if (m==CMAP) {
+            if (b[i] > 4)  { bs.at(j)[3-k] = 1; }
+            if (b[i]!=0 && b[i]!= 9) {
+                // anomoly
+                features.push_back({ line_code + "_" + to_string(i), b[i]});
+            }
         } else {
-            // record anomoly
-            // then round
-            if (m == FMAP || m == SMAP) {
+            if (b[i] != 0) {
                 bs.at(j)[3-k] = 1;
-            } else {
-                if (b[i] > 4) {
-                    bs.at(j)[3-k] = 1;
+                if (b[i] != (unsigned char)(-1)) {
+                    // anomoly
+                    features.push_back({ line_code + "_" + to_string(i), b[i]});
                 }
             }
         }
-        
-        
-        if (b[i] == -1)
-        if (b[i] == 9 && m==CMAP) { bs.at(j)[3-k] = 1;}
     }
     stringstream ss;
     for (int j=0; j<bytecount/4+1; j++) {
@@ -350,6 +354,8 @@ string read_map(ifstream &in, int bytecount, translation_type m) {
 }
 void unpack_section (section mysection, ifstream & in, ofstream & out, int offset) {
     if (mysection.name == "Log") { out << "# Ship's Log\n"; } // hack to match perl.
+    
+    vector<feature> features;
     
     // section: Ship_0_0
     for (int c=offset; c<mysection.count+offset;c++) {
@@ -419,6 +425,9 @@ void unpack_section (section mysection, ifstream & in, ofstream & out, int offse
             continue;
         }
         
+        
+        //// NOTE a big break here. The code above is for splitting a section, the code below is for reading a line.
+        
         auto method = mysection.method;
         auto bytes_per_line = mysection.bytes_per_line;
         
@@ -460,7 +469,7 @@ void unpack_section (section mysection, ifstream & in, ofstream & out, int offse
             case FMAP :
             case SMAP :
             case CMAP :
-                value = read_map(in,bytes_per_line,method);
+                value = read_world_map(in,bytes_per_line,method, subsection, features);
                 break;
             case BINARY :
                 value = read_binary(in);
@@ -502,12 +511,26 @@ void unpack_section (section mysection, ifstream & in, ofstream & out, int offse
         if (method==INT && stoi(value) < 0) {
             value = to_string((unsigned int)(stoi(value)));
         }
-        if (mysection.name == "FeatureMap" || mysection.name == "SailingMap" || mysection.name == "CoastMap") { subsection += "_293"; }
+        
+        if (is_world_map(method)) {
+            subsection += "_293";
+        }
         
         out << subsection << "   : " << char_for_method.at(method) << to_string(linesize);
         out << "   :   " << value << "   :   " << comment << " " << translation << "\n";
         
     }
+    if (is_world_map(mysection.method)) {
+        for (auto f : features) {
+            // Yes, this is the same as above. I need to refactor.
+            string translation = full_translate(f.line_code, to_string(f.v));
+            string comment = full_comment(f.line_code, to_string(f.v));
+            char buffer[3];
+            sprintf(buffer, "%02x", f.v);
+            out << f.line_code << "   : F1   :  " << buffer << "  :  " << comment << " " << translation << "\n";
+        }
+    }
+    
 }
 
 int starting_year;

@@ -37,7 +37,7 @@ enum translatable : char {
     // or in the translation_functions
     DIR, SHIPNAME, STORE_CITYNAME, DATE, FOLLOWING, CITY_BY_LINECODE, WEALTH, POPULATION,
     POPULATION_TYPE, ACRES, LUXURIES_AND_SPICES, BEAUTY_AND_SHIPWRIGHT, FURTHER_EVENT, SHIP_SPECIALIST,
-    PEACE_AND_WAR, DATE_AND_AGE, TREASURE_MAP,
+    PEACE_AND_WAR, DATE_AND_AGE, TREASURE_MAP, LANDMARK,
     // If it is not mapped in either, that is not an error: it is hook for future code).
 };
 
@@ -126,6 +126,9 @@ map <translatable, vector<string>> translation_lists = {
     { BETTER_ITEM, {"perfectly balance swords", "brace of pistols", "metal cuiraiss", "silk shirt", "fine telescope", "spanish rutter",
         "precision barometer", "concertina","theatrical disguise", "Incan mystic salve", "carved shaman stick", "sacred relic",
         "diamond necklace", "dancing slippers", "ostrich feather hat", "skeleton key","signal flare"}},
+    { LANDMARK, {"", "city/settlement", "shipwreck", "" ,"", "", "", "", "" ,"", "", "", "city/settlement","", "", "",
+        "Landmark", "X", "cool temple (unruined)", "inca temple", "abandoned cabin", "abandoned cabin", "geyser",
+        "dead tree(s)", "arch rock", "palms", "stone head", "totem pole"}},
 };
 
 // Translations that require special effort or which are called to store data.
@@ -585,7 +588,9 @@ map<string,decode_for_line> line_decode = {
     {"CityLoc_x_1",       {"y coord",}},
     {"CityLoc_x_2",       {"pier direction", DIR}},
     {"CityLoc_x_3",       {"fort direction", DIR}},
-
+    {"CoastMap_x_x",      {"", LANDMARK}},
+    {"SailingMap_x_x",    {"", LANDMARK}},
+    {"FeatureMap_x_x",    {"", LANDMARK}},
     
     {"Top10_x_0",         {"Gold Plundered"}},
     {"Top10_x_1_0",       {"status ?/D/D/?/?/D/D/treasure_found  (D bits went to 1 on capture)"}},
