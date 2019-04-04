@@ -23,16 +23,16 @@ using namespace std;
 int index_from_linecode (string line_code);
 
 
-enum translation_type { TEXT0, TEXT8, HEX, INT, BINARY, SHORT, CHAR, LCHAR, mFLOAT, uFLOAT, MAP, BULK, ZERO };
+enum translation_type { TEXT0, TEXT8, HEX, INT, BINARY, SHORT, CHAR, LCHAR, mFLOAT, uFLOAT, FMAP, SMAP, CMAP, BULK, ZERO };
 
 // The translation types have one character abbreviations in the pst file.
-const map<translation_type,char> char_for_method = {
-    {TEXT0,'t'}, {TEXT8,'t'}, {INT, 'V'}, {HEX, 'h'}, {BINARY, 'B'}, {SHORT, 's'}, {CHAR, 'C'}, {MAP, 'm'}, {BULK, 'H'},
-    {ZERO,'x'}, {uFLOAT,'G'}, {mFLOAT, 'g'},{LCHAR, 'c'},
+const map<translation_type,string> char_for_method = {
+    {TEXT0,"t"}, {TEXT8,"t"}, {INT, "V"}, {HEX, "h"}, {BINARY, "B"}, {SHORT, "s"}, {CHAR, "C"}, {FMAP, "M"}, {BULK, "H"},
+    {ZERO,"x"}, {uFLOAT,"G"}, {mFLOAT, "g"},{LCHAR, "c"}, {SMAP, "m"}, {CMAP, "MM"},
 };
 
 const map<translation_type,char> size_for_method = {
-    {TEXT0,0}, {TEXT8,8}, {INT,4}, {HEX,4}, {BINARY,1}, {SHORT,2}, {CHAR,1}, {MAP,291}, {ZERO,0},
+    {TEXT0,0}, {TEXT8,8}, {INT,4}, {HEX,4}, {BINARY,1}, {SHORT,2}, {CHAR,1}, {ZERO,0},
     {uFLOAT,4}, {BULK, 4}, {LCHAR, 1}, {mFLOAT, 4},
 };
 
@@ -66,9 +66,9 @@ const vector<section> section_vector = {
     {"Quest",            64,      32, },
     {"LogCount",          1,       4, INT},
     {"TopoMap",         462,     586, },
-    {"FeatureMap",      462,     293, },
+    {"FeatureMap",      462,     293, FMAP},
     {"TreasureMap",       4,     328, },
-    {"SailingMap",      462,     293, },
+    {"SailingMap",      462,     293, SMAP},
     {"vv",              256,      12, },
     {"vvv",               2,       4, INT},
     {"Top10",            10,      28, },
@@ -76,7 +76,7 @@ const vector<section> section_vector = {
     {"Villain",          28,      36, },
     {"t",                 1,      120, },
     {"CityLoc",         128,      16, },
-    {"CoastMap",        462,     293, },
+    {"CoastMap",        462,     293, CMAP},
     {"k",                 8,       4, INT},
     {"LandingParty",      8,      32, },
     {"m",                 1,      12, },
@@ -304,6 +304,50 @@ string read_mFloat(ifstream &in) {
     return retstring;
 }
 
+string read_map(ifstream &in, int bytecount, translation_type m) {
+    char b[600];
+    in.read((char*)&b, bytecount);
+    
+    vector<bitset<4> > bs(bytecount/4+1, 0);
+    
+    // The bytes read have values 00, 09, or FF at each byte, except for anomolies.
+    // 00 represents sea, FF is land. 09 is for the boundary.
+    // To make the output more readable and editable, we compress the land/sea down to single bits and print that a hex
+    // and then add lines afterwards to account for anomolies.
+  
+    for (int i=0; i<bytecount; i++) {
+        auto j = i/4;
+        auto k = i % 4;
+        if ((m == FMAP || m == SMAP) && b[i] == -1) {
+            bs.at(j)[3-k] = 1;
+        } else if (m==CMAP && b[i] == 9) {
+            bs.at(j)[3-k] = 1;
+        } else if (b[i] == 0 ) {
+            bs.at(j)[3-k] = 0;
+        } else {
+            // record anomoly
+            // then round
+            if (m == FMAP || m == SMAP) {
+                bs.at(j)[3-k] = 1;
+            } else {
+                if (b[i] > 4) {
+                    bs.at(j)[3-k] = 1;
+                }
+            }
+        }
+        
+        
+        if (b[i] == -1)
+        if (b[i] == 9 && m==CMAP) { bs.at(j)[3-k] = 1;}
+    }
+    stringstream ss;
+    for (int j=0; j<bytecount/4+1; j++) {
+        ss << std::noshowbase << std::hex << bs[j].to_ulong();
+    }
+    if (m==SMAP) { return ""; }
+    return ss.str();
+    
+}
 void unpack_section (section mysection, ifstream & in, ofstream & out, int offset) {
     if (mysection.name == "Log") { out << "# Ship's Log\n"; } // hack to match perl.
     
@@ -413,6 +457,11 @@ void unpack_section (section mysection, ifstream & in, ofstream & out, int offse
             case HEX :
                 value = read_hex(in);
                 break;
+            case FMAP :
+            case SMAP :
+            case CMAP :
+                value = read_map(in,bytes_per_line,method);
+                break;
             case BINARY :
                 value = read_binary(in);
                 break;
@@ -448,11 +497,12 @@ void unpack_section (section mysection, ifstream & in, ofstream & out, int offse
             store_startingyear(in);
         }
         
-        // Matching bug in perl script
+        // Matching bugs in perl script
         // -1 -> "4294967295";
         if (method==INT && stoi(value) < 0) {
             value = to_string((unsigned int)(stoi(value)));
         }
+        if (mysection.name == "FeatureMap" || mysection.name == "SailingMap" || mysection.name == "CoastMap") { subsection += "_293"; }
         
         out << subsection << "   : " << char_for_method.at(method) << to_string(linesize);
         out << "   :   " << value << "   :   " << comment << " " << translation << "\n";
