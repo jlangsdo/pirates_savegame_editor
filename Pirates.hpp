@@ -25,7 +25,7 @@ void pack_pst_to_pg(std::string pst, std::string pg);
 void store_startingyear(std::ifstream & in) ;
 
 enum translation_type : char;
-
+int read_int(std::ifstream & in);
 void print_one_line(std::ofstream & out, std::string line_code, translation_type method, int bytes_per_line, std::string value);
 void print_one_line(std::ofstream & out, std::string line_code, translation_type method, int bytes_per_line, int v);
 

@@ -22,10 +22,6 @@ using namespace std;
 
 int index_from_linecode (string line_code);
 
-// The savegame file has variable length parts at the beginning and end,
-// and a huge fixed length section in the middle. Once we hit the start of the fixed length section,
-// it makes sense to peek far ahead to read the starting year, so that it can be used in all of the datestamps.
-const string start_of_fixed_length_section = "Personal_0";
 
 enum translation_type : char { TEXT0, TEXT8, HEX, INT, BINARY, SHORT, CHAR, LCHAR, mFLOAT, uFLOAT, FMAP, SMAP, CMAP, BULK, ZERO };
 
@@ -356,6 +352,7 @@ string read_world_map(ifstream &in, int bytecount, translation_type m, string li
     return ss.str();
     
 }
+
 void unpack_section (section mysection, ifstream & in, ofstream & out, int offset) {
     if (mysection.name == "Log") { out << "# Ship's Log\n"; } // hack to match perl.
     
@@ -497,26 +494,10 @@ void unpack_section (section mysection, ifstream & in, ofstream & out, int offse
                 break;
         }
         
-        string translation = full_translate(subsection, value);
-        string comment = full_comment(subsection, value);
+        // Another big break. From here down is printing the line.
+        if (is_world_map(method)) { subsection += "_293"; }
         
-        if (subsection == start_of_fixed_length_section) {
-            store_startingyear(in);
-        }
-        
-        // Matching bugs in perl script
-        // -1 -> "4294967295";
-        if (method==INT && stoi(value) < 0) {
-            value = to_string((unsigned int)(stoi(value)));
-        }
-        
-        if (is_world_map(method)) {
-            subsection += "_293";
-        }
-        
-        out << subsection << "   : " << char_for_method.at(method) << to_string(bytes_per_line);
-        out << "   :   " << value << "   :   " << comment << " " << translation << "\n";
-        
+        print_pst_line (in, out, subsection, char_for_method.at(method) + to_string(bytes_per_line), value);
     }
     if (is_world_map(mysection.method)) {
         for (auto f : features) {
@@ -530,16 +511,3 @@ void unpack_section (section mysection, ifstream & in, ofstream & out, int offse
     }
 }
 
-
-
-int starting_year;
-void store_startingyear(ifstream & in) {
-    // We're going to jump way forward in the file to read the start year, and then put it into a persistent
-    // variable, for use in decoding DateStamps. Then jump right back.
-    constexpr int jump_dist = 887272;
-    in.seekg(jump_dist, ios_base::cur);
-    starting_year = read_int(in);
-    in.seekg(-jump_dist-4, ios_base::cur);
-    
-    
-}

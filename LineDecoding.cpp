@@ -20,10 +20,23 @@
 #include <iomanip>
 #include <iostream>
 #include "ship_names.hpp"
+#include <fstream>
+#include "Pirates.hpp"
 using namespace std;
 
-const int number_of_true_cities = 44;
-extern int starting_year;
+// The savegame file has variable length parts at the beginning and end,
+// and a huge fixed length section in the middle. Once we hit the start of the fixed length section,
+// it makes sense to peek far ahead to read the starting year, so that it can be used in all of the datestamps.
+const string start_of_fixed_length_section = "Personal_0";
+int starting_year;
+void store_startingyear(ifstream & in) {
+    constexpr int jump_dist = 887272;
+    in.seekg(jump_dist, ios_base::cur);
+    starting_year = read_int(in);
+    in.seekg(-jump_dist-4, ios_base::cur);
+}
+
+const int number_of_true_cities = 44; // Cities after this number are settlements, indian villages, Jesuit missions, or pirate bases.
 
 enum translatable : char {
     // All translatable enums should be mapped in the translation_lists
@@ -723,4 +736,24 @@ string full_comment(string line_code, string value) {
         }
     }
     return "";
+}
+
+void print_pst_line (std::ifstream &in, std::ofstream &out, std::string &subsection, std::string method, std::string &value) {
+    string translation = full_translate(subsection, value);
+    string comment = full_comment(subsection, value);
+    
+    if (subsection == start_of_fixed_length_section) {
+        store_startingyear(in);
+    }
+    
+    // Matching bugs in perl script
+    // -1 -> "4294967295";
+    if (method=="V4" && stoi(value) < 0) {
+        value = to_string((unsigned int)(stoi(value)));
+    }
+    
+    
+    out << subsection << "   : " <<  method;
+    out << "   :   " << value << "   :   ";
+    out << comment << " " << translation << "\n";
 }

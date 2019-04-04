@@ -13,6 +13,7 @@
 #include <map>
 #include <vector>
 #include <string>
+#include "Pirates.hpp"
 
 enum translatable : char;
 
@@ -27,7 +28,7 @@ struct info_for_line_decode {
     std::string line_code;
 };
 // Master routines
-
+void print_pst_line (std::ifstream &in, std::ofstream &out, std::string &subsection, std::string method, std::string &value);
 std::string full_translate(std::string subsection, std::string value) ;
 std::string full_comment(std::string subsection, std::string value) ;
 
@@ -62,6 +63,6 @@ std::string translate_date(info_for_line_decode) ;
 std::string translate_date_and_age(info_for_line_decode) ;
 std::string translate_peace_and_war(info_for_line_decode) ;
 std::string translate_treasure_map(info_for_line_decode) ;
-std::string translate_pirate_hangout(info_for_line_decode); 
+std::string translate_pirate_hangout(info_for_line_decode);
 
 #endif /* LineDecoding_hpp */
