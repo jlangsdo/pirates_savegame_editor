@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include <string>
 #include <fstream>
+#include <string>
 
 // Filename suffixes
 const std::string pg  = "pirates_savegame";
@@ -22,5 +23,10 @@ void augment_decoder_groups();
 void unpack_pg_to_pst(std::string pg, std::string pst);
 void pack_pst_to_pg(std::string pst, std::string pg);
 void store_startingyear(std::ifstream & in) ;
+
+enum translation_type : char;
+
+void print_one_line(std::ofstream & out, std::string line_code, translation_type method, int bytes_per_line, std::string value);
+void print_one_line(std::ofstream & out, std::string line_code, translation_type method, int bytes_per_line, int v);
 
 #endif /* Pirates_hpp */

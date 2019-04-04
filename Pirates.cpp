@@ -22,8 +22,12 @@ using namespace std;
 
 int index_from_linecode (string line_code);
 
+// The savegame file has variable length parts at the beginning and end,
+// and a huge fixed length section in the middle. Once we hit the start of the fixed length section,
+// it makes sense to peek far ahead to read the starting year, so that it can be used in all of the datestamps.
+const string start_of_fixed_length_section = "Personal_0";
 
-enum translation_type { TEXT0, TEXT8, HEX, INT, BINARY, SHORT, CHAR, LCHAR, mFLOAT, uFLOAT, FMAP, SMAP, CMAP, BULK, ZERO };
+enum translation_type : char { TEXT0, TEXT8, HEX, INT, BINARY, SHORT, CHAR, LCHAR, mFLOAT, uFLOAT, FMAP, SMAP, CMAP, BULK, ZERO };
 
 bool is_world_map(translation_type m) {
     // world maps get special handling.
@@ -64,7 +68,7 @@ struct feature {
 //
 const vector<section> section_vector = {
     {"Intro",             6,       4,  INT },
-    {"CityName",        128,       0,  TEXT8 },
+    {"CityName",        128,       8,  TEXT8 },
     {"Personal",         57,       4,  INT },
     {"Ship",            128,    1116, },
     {"f",               128,    1116, },
@@ -90,7 +94,7 @@ const vector<section> section_vector = {
     {"k",                 8,       4, INT},
     {"LandingParty",      8,      32, },
     {"m",                 1,      12, },
-    {"ShipName",          8,       0,  TEXT8 },
+    {"ShipName",          8,       8,  TEXT8 },
     {"Skill",             1,       4, INT },
     
 };
@@ -496,13 +500,7 @@ void unpack_section (section mysection, ifstream & in, ofstream & out, int offse
         string translation = full_translate(subsection, value);
         string comment = full_comment(subsection, value);
         
-        // Fix this.
-        int linesize = bytes_per_line;
-        if (method==TEXT0) { linesize = 0;}
-        if (method==TEXT8) { linesize = 8;}
-        
-        //
-        if (subsection == "Personal_0") {
+        if (subsection == start_of_fixed_length_section) {
             store_startingyear(in);
         }
         
@@ -516,7 +514,7 @@ void unpack_section (section mysection, ifstream & in, ofstream & out, int offse
             subsection += "_293";
         }
         
-        out << subsection << "   : " << char_for_method.at(method) << to_string(linesize);
+        out << subsection << "   : " << char_for_method.at(method) << to_string(bytes_per_line);
         out << "   :   " << value << "   :   " << comment << " " << translation << "\n";
         
     }
@@ -530,8 +528,9 @@ void unpack_section (section mysection, ifstream & in, ofstream & out, int offse
             out << f.line_code << "   : F1   :  " << buffer << "  :  " << comment << " " << translation << "\n";
         }
     }
-    
 }
+
+
 
 int starting_year;
 void store_startingyear(ifstream & in) {
