@@ -62,6 +62,6 @@ std::string translate_date(info_for_line_decode) ;
 std::string translate_date_and_age(info_for_line_decode) ;
 std::string translate_peace_and_war(info_for_line_decode) ;
 std::string translate_treasure_map(info_for_line_decode) ;
-
+std::string translate_pirate_hangout(info_for_line_decode); 
 
 #endif /* LineDecoding_hpp */

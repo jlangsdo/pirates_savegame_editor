@@ -33,7 +33,7 @@ enum translatable : char {
     EVENT, EVENTS3, EVENTS15, EVENTS32, EVENTS64,
     PURPOSE, PURPOSE0, PURPOSE30, PURPOSE40,
     WEALTH_CLASS, POPULATION_CLASS, SOLDIERS, FLAG_TYPE, SPECIALIST,
-    ITEM, BETTER_ITEM,
+    ITEM, BETTER_ITEM, PIRATE_HANGOUT,
     // or in the translation_functions
     DIR, SHIPNAME, STORE_CITYNAME, DATE, FOLLOWING, CITY_BY_LINECODE, WEALTH, POPULATION,
     POPULATION_TYPE, ACRES, LUXURIES_AND_SPICES, BEAUTY_AND_SHIPWRIGHT, FURTHER_EVENT, SHIP_SPECIALIST,
@@ -116,7 +116,7 @@ map <translatable, vector<string>> translation_lists = {
     { EVENTS64, {"Treasure fleet headed for","","smuggler sighted", "", "Evil character seen in", "Wanted criminal hiding in" }},
     { EVENT, vector<string> (70)},
     { PURPOSE, vector<string> (70)},
-    { PURPOSE0, {"quest"," Delivering ultimatum", "Delivering peace treaty", "Transporting immigrants", "Delivering vital medicines",
+    { PURPOSE0, {"quest","Delivering ultimatum", "Delivering peace treaty", "Transporting immigrants", "Delivering vital medicines",
         "Transporting new governor", "Pirate raiders", "Invasion force", "Transporting sugar plants", "Indian war canoe",
         "Transporting troops", "Proposing amnesty", "Treasure ship", "Military payroll", "Grain transport", "New warship"}},
     { PURPOSE30, {"criminal"}}, {PURPOSE40, {"Raymondo","Mendoza", "Montalban"}},
@@ -151,6 +151,7 @@ map <translatable, string (*)(info_for_line_decode i)> translation_functions = {
     { PEACE_AND_WAR, translate_peace_and_war},
     { DATE_AND_AGE, translate_date_and_age},
     { TREASURE_MAP, translate_treasure_map},
+    { PIRATE_HANGOUT, translate_pirate_hangout},
 };
 
 
@@ -169,7 +170,10 @@ string translate_luxuries_and_spices(info_for_line_decode i) {
     if (as_int == 0) { return ""; }
     return to_string(as_int);
 }
-
+string translate_pirate_hangout(info_for_line_decode i) {
+    if (i.v == -1) { return "N/A"; }
+    return simple_translate(CITYNAME, i.v);
+}
 string translate_population(info_for_line_decode i) {
     return to_string( 200 * i.v);
 }
@@ -195,9 +199,13 @@ string simple_translate (translatable t, int as_int) {
             if (list.at(as_int).size() > 0) {
                 return list.at(as_int);
             } else { return ""; }
-        } else {
-            // For backward compatability to perl version of this code.
-            if (t == SHIP_TYPE) return "NIL";
+        } else if (as_int==-1) {
+            switch (t) { // Perhaps I need a separate array for values at -1, or add one before accessing all arrays.
+                case SHIP_TYPE    : return "NIL";
+                case SPECIAL_MOVE : return "NONE";
+               // case CITYNAME     : return "N/A";
+                default           : return "";
+            }
         }
     }
     return "";
@@ -563,6 +571,34 @@ map<string,decode_for_line> line_decode = {
     {"TreasureMap_1_16",  {"Lost Relative"}},
     {"TreasureMap_2_16",  {"Lost City"}},
     {"TreasureMap_3_16",  {"Montalban's Hideout"}},
+    {"Villain_x_0",       {"Flag 06 = pirate, 40 = Raymondo, 42 = Montalban, 30 = wanted criminal"}},
+    {"Villain_x_1",       {"Ship number"}},
+    {"Villain_x_2",       {"Pirate hangout",   PIRATE_HANGOUT}},
+    {"Villain_x_3",       {"criminal letter"}},
+    {"Villain_x_4_0",     {"visibility 0/active/ship/special_move/ship/ship_upgrades/ship/active"}},
+    {"Villain_x_8",       {"Icon 1-9 named pirates, 30-33 criminals, 41=Raymondo"}},
+    {"Villain_x_10",      {"DateStamp",   DATE}},
+    {"Villain_x_5",       {"Special Move",   SPECIAL_MOVE}},
+    {"Villain_x_15",      {"Starting City",   CITYNAME}},
+    {"Villain_x_16",      {"Destination City",   CITYNAME}},
+    {"CityLoc_x_0",       {"x coord", CITY_BY_LINECODE}},
+    {"CityLoc_x_1",       {"y coord",}},
+    {"CityLoc_x_2",       {"pier direction", DIR}},
+    {"CityLoc_x_3",       {"fort direction", DIR}},
+
+    
+    {"Top10_x_0",         {"Gold Plundered"}},
+    {"Top10_x_1_0",       {"status ?/D/D/?/?/D/D/treasure_found  (D bits went to 1 on capture)"}},
+    {"Top10_x_11",        {"Unique Items"}},
+    {"Top10_x_10",        {"Treasures Found"}},
+    {"Top10_x_9",         {"Promotions Earned"}},
+    {"Top10_x_8",         {"Towns Ransacked"}},
+    {"Top10_x_7",         {"Ships Captured"}},
+    {"LandingParty_0_0",  {"x coordinate"}},
+    {"LandingParty_1_0",  {"y coordinate"}},
+    {"LandingParty_3_0",  {"Direction", DIR}},
+    {"Skill_0",           { "", SKILL}},
+
 };
 
 

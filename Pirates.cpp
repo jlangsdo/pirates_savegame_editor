@@ -28,16 +28,13 @@ enum translation_type { TEXT0, TEXT8, HEX, INT, BINARY, SHORT, CHAR, LCHAR, mFLO
 // The translation types have one character abbreviations in the pst file.
 const map<translation_type,char> char_for_method = {
     {TEXT0,'t'}, {TEXT8,'t'}, {INT, 'V'}, {HEX, 'h'}, {BINARY, 'B'}, {SHORT, 's'}, {CHAR, 'C'}, {MAP, 'm'}, {BULK, 'H'},
-    {ZERO,'x'}, {uFLOAT,'G'}, {LCHAR, 'c'},
+    {ZERO,'x'}, {uFLOAT,'G'}, {mFLOAT, 'g'},{LCHAR, 'c'},
 };
 
 const map<translation_type,char> size_for_method = {
     {TEXT0,0}, {TEXT8,8}, {INT,4}, {HEX,4}, {BINARY,1}, {SHORT,2}, {CHAR,1}, {MAP,291}, {ZERO,0},
-    {uFLOAT,4}, {BULK, 4}, {LCHAR, 1},
+    {uFLOAT,4}, {BULK, 4}, {LCHAR, 1}, {mFLOAT, 4},
 };
-
-// Sections of the savegame file, in the order that they appear.
-const string sections[] = {"Intro", "CityName", "Personal", "Ship", "f", "City", "CityInfo", "Log", "j", "e", "Quest","LogCount","TopoMap","FeatureMap", "TreasureMap", "SailingMap", "vv", "vvv", "Top10","d", "Villain", "t", "CityLoc", "CoastMap", "k", "LandingParty","m", "ShipName", "Skill"};
 
 struct section {
     string name;
@@ -73,18 +70,18 @@ const vector<section> section_vector = {
     {"TreasureMap",       4,     328, },
     {"SailingMap",      462,     293, },
     {"vv",              256,      12, },
-    {"vvv",               2,       4, },
+    {"vvv",               2,       4, INT},
     {"Top10",            10,      28, },
-    {"d",                 1,      36, },
+    {"d",                 1,      36, ZERO},
     {"Villain",          28,      36, },
-    {"t",                 8,      15, },
+    {"t",                 1,      120, },
     {"CityLoc",         128,      16, },
     {"CoastMap",        462,     293, },
-    {"k",                 8,       4, },
+    {"k",                 8,       4, INT},
     {"LandingParty",      8,      32, },
     {"m",                 1,      12, },
     {"ShipName",          8,       0,  TEXT8 },
-    {"Skill",             1,       4, },
+    {"Skill",             1,       4, INT },
     
 };
 
@@ -129,6 +126,12 @@ map<string,translation_type> subsection_simple_decode = {
     {"e_x",           INT},
     {"Quest_x",       INT},
     {"TreasureMap_x", INT},
+    {"vv_x",          INT},
+    {"Villain_x_4",   BINARY},
+    {"t_7",           INT},
+    {"LandingParty_0",uFLOAT},
+    {"LandingParty_1",uFLOAT},
+    {"LandingParty_x",HEX},
 };
 
 // split up a section into multiple sections that may be of different or variable types and sizes.
@@ -149,6 +152,11 @@ map<string,vector<subsection_info>> subsection_manual_decode = {
     {"CityInfo_x_1",  {{INT}, {BULK}, {INT,4,5}, {SHORT,2,10}}},               //  48 = 4*(1+1+5)+2*10;
     {"Log_x",         {{LCHAR,1,8}, {INT,4,3}, {uFLOAT,4,2}}}, // 28 = 8+4*3+4*2
     {"TreasureMap_x_68", {{BULK,1}, {BINARY,1}, {BULK,1}, {BINARY,1}}}, // 4 = 1+1+1=1
+    {"Villain_x",     {{SHORT,2,10}, {INT,4}, {SHORT,2,6}}}, // 36 = 2*10 + 4 + 2*6
+    {"CityLoc_x",     {{mFLOAT,4,2}, {HEX,4,2}}}, // 16 = 4*2 + 4*2
+    {"t",             {{BULK,8,1}, {BULK,16,7}}},
+    {"Top10_x",       {{INT,4,2}, {SHORT,2,10}}}, // 28 = 4*2 + 2*10
+    {"Top10_x_1",     {{BINARY}, {ZERO,3}}},
 };
 
 // The zero length zero string for Ship_x_4_5 happened because two adjacent shorts were switched
@@ -286,6 +294,16 @@ string read_uFloat(ifstream &in) {
     return to_string(double(raw)/1000000);
 }
 
+
+string read_mFloat(ifstream &in) {
+    auto raw = read_int(in);
+    string retstring = to_string(double(raw)/1000);
+    // backward compatibility to match perl:
+    retstring = regex_replace(retstring, regex("000$"), "");
+    if (retstring == "0.000") { retstring = "0"; }
+    return retstring;
+}
+
 void unpack_section (section mysection, ifstream & in, ofstream & out, int offset) {
     if (mysection.name == "Log") { out << "# Ship's Log\n"; } // hack to match perl.
     
@@ -401,6 +419,9 @@ void unpack_section (section mysection, ifstream & in, ofstream & out, int offse
             case SHORT :
                 value = read_short(in);
                 break;
+            case mFLOAT :
+                value = read_mFloat(in);
+                break;
             case uFLOAT :
                 value = read_uFloat(in);
                 break;
@@ -447,4 +468,6 @@ void store_startingyear(ifstream & in) {
     in.seekg(jump_dist, ios_base::cur);
     starting_year = read_int(in);
     in.seekg(-jump_dist-4, ios_base::cur);
+    
+    
 }
