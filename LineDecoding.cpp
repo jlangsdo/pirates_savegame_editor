@@ -24,6 +24,11 @@
 #include "Pirates.hpp"
 using namespace std;
 
+// This file handles printing a line of the pst file - decoding the comment and translation,
+// based on the line_code.
+
+
+
 // The savegame file has variable length parts at the beginning and end,
 // and a huge fixed length section in the middle. Once we hit the start of the fixed length section,
 // it makes sense to peek far ahead to read the starting year, so that it can be used in all of the datestamps.
@@ -294,12 +299,6 @@ string translate_population_type (info_for_line_decode i) {
     return simple_translate(POPULATION_CLASS, (int)pop_group + magic_number*is_wealthy);
 }
 
-
-pair<int, int> break_into_two (string value) {
-    int asint = stoi(value);
-    return make_pair((asint/16)%16, asint %16);
-}
-
 string translate_dir (info_for_line_decode i) {  // Reads the hex string in value
     char first_char = i.value.at(0);             // rather than the integer v.
     char second_char = i.value.at(1);
@@ -327,7 +326,7 @@ int stored_event;
 int subevent;
 int temp_i;
 string translate_event(info_for_line_decode i) {
-    auto as_two = break_into_two(i.value);
+    auto as_two = make_pair(i.v/16, i.v%16);
     int index = suffix_from_linecode(i.line_code);
     switch (index) {
         case 0:
@@ -699,34 +698,23 @@ string translate_date(info_for_line_decode i) { // Translate the datestamp into 
     return retval;
 }
 
-string full_translate(string line_code, string value) {
-    string translation;
+string full_translate(info_for_line_decode i) {
     
-    int v = 0;
-    try {
-        v = stoi(value);   // Most decodes will use v as an integer.
-    } catch (std::invalid_argument& e) {
-        // Bulk decode. Don't send a value.
-    } catch(std::out_of_range& e) {
-        // Bulk decode that looks like an integer. Don't send a value.
-    }
-    
-    string temp_line_code = line_code;
+    string temp_line_code = i.line_code;
     while(true) { // Improved, now handles Log_x_x and we don't need to pass subsection_x.
         if (line_decode.count(temp_line_code) && line_decode.at(temp_line_code).t != NIL) {
-            return translate(line_decode.at(temp_line_code).t, { value, v, line_code});
+            return translate(line_decode.at(temp_line_code).t, i);
         } else {
             if (! regex_search(temp_line_code, regex("_\\d"))) { break; }
             temp_line_code = regex_replace(temp_line_code, regex("_\\d+"), "_x", std::regex_constants::format_first_only);
         }
     }
-    
     return "";
 }
 
 
-string full_comment(string line_code, string value) {
-    string temp_line_code = line_code;
+string full_comment(info_for_line_decode i) {
+    string temp_line_code = i.line_code;
     while(true) { // Improved, now handles Log_x_x and we don't need to pass subsection_x.
         if (line_decode.count(temp_line_code)) {
             return line_decode.at(temp_line_code).comment;
@@ -738,22 +726,24 @@ string full_comment(string line_code, string value) {
     return "";
 }
 
-void print_pst_line (std::ifstream &in, std::ofstream &out, std::string &subsection, std::string method, std::string &value) {
-    string translation = full_translate(subsection, value);
-    string comment = full_comment(subsection, value);
-    
-    if (subsection == start_of_fixed_length_section) {
+void check_for_specials(std::ifstream &in, string line_code) {
+    if (line_code == start_of_fixed_length_section) {
         store_startingyear(in);
     }
+}
+
+void print_pst_line (std::ofstream &out, string typecode, info_for_line_decode i) {
+    string translation = full_translate(i);
+    string comment = full_comment(i);
+    
     
     // Matching bugs in perl script
     // -1 -> "4294967295";
-    if (method=="V4" && stoi(value) < 0) {
-        value = to_string((unsigned int)(stoi(value)));
+    if (typecode=="V4" && i.v < 0) {
+        i.value = to_string((unsigned int)i.v);
     }
     
-    
-    out << subsection << "   : " <<  method;
-    out << "   :   " << value << "   :   ";
+    out << i.line_code << "   : " <<  typecode ;
+    out << "   :   " << i.value << "   :   ";
     out << comment << " " << translation << "\n";
 }

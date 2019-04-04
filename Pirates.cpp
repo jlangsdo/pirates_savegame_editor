@@ -48,11 +48,6 @@ struct section {
     translation_type method = BULK;    // Decode method for this section.
 };
 
-struct feature {
-    string line_code;                   // world_map features get printed as separate lines
-    unsigned char v;
-};
-
 // Main description of contents and size of each section, in order.
 //    sections with single letter names are generally not understood.
 //
@@ -231,17 +226,16 @@ void unpack_pg_to_pst(string pg_file, string pst_file) {
     pst_out.close();
 }
 
-string read_hex(ifstream & in) { // Read 4 bytes from in and report in hex
+void read_hex(ifstream & in, info_for_line_decode & i) { // Read 4 bytes from in and report in hex
     char b[4];
     in.read((char*)&b, sizeof(b));
-    string res;
     char buffer[255];
-    for (int i=3;i>=0;i--) {
-        sprintf(buffer, "%02X", (unsigned char)b[i]);
-        res += buffer;
-        if (i>0) res += '.';
+    for (int j=3;j>=0;j--) {
+        sprintf(buffer, "%02X", (unsigned char)b[j]);
+        i.value += buffer;
+        if (j>0) i.value += '.';
     }
-    return res;
+    i.v = (int)b[3];
 }
 
 string read_bulk_hex(ifstream & in, int bytecount) { // Read bytecount bytes from in and report in one big bulk hex
@@ -268,24 +262,26 @@ string read_zeros(ifstream & in, int bytecount) { // Read bytecount bytes from i
 }
 
 
-string read_binary(ifstream & in) { // Read 1 byte from in and report as binary string
+void read_binary(ifstream & in, info_for_line_decode & i) { // Read 1 byte from in and report as binary string
     char b;
     in.read((char*)&b, sizeof(b));
     std::bitset<8> asbits(b);
-    return asbits.to_string();
+    i.value = asbits.to_string();
+    i.v = (int)b;
 }
 
-string read_char(ifstream & in) { // Read 1 byte from in and report as an int string
+void read_char(ifstream & in, info_for_line_decode & i) { // Read 1 byte from in and report as an int string
     char b;
     in.read((char*)&b, sizeof(b));
-    return to_string(b);
+    i.value = to_string(b);
+    i.v = (int)b;
 }
 
-string read_short(ifstream &in) { // Read 2 bytes as a signed int and return as string
+void read_short(ifstream &in, info_for_line_decode & i) { // Read 2 bytes as a signed int and return as string
     char b[2];
     in.read((char*)&b, sizeof(b));
-    int B = int((unsigned char)(b[0]) | (char)(b[1]) << 8);
-    return to_string(B);
+    i.v = int((unsigned char)(b[0]) | (char)(b[1]) << 8);
+    i.value = to_string(i.v);
 }
 
 int read_int(ifstream & in) { // Read 4 bytes from in (little endian) and convert to integer
@@ -314,7 +310,7 @@ string read_mFloat(ifstream &in) {
     return retstring;
 }
 
-string read_world_map(ifstream &in, int bytecount, translation_type m, string line_code, vector<feature> & features) {
+string read_world_map(ifstream &in, int bytecount, translation_type m, string line_code, vector<info_for_line_decode> & features) {
     unsigned char b[600];
     in.read((char*)&b, bytecount);
     
@@ -322,28 +318,30 @@ string read_world_map(ifstream &in, int bytecount, translation_type m, string li
     
     // The bytes read have values 00, 09, or FF at each byte, except for anomolies.
     // 00 represents sea, FF is land. 09 is for the boundary.
-    // To make the output more readable and editable, we compress the land/sea down to single bits and print that a hex
-    // and then add lines afterwards to account for anomolies.
-  
+    // To make the output more readable and editable, we compress the land/sea down to single bits
+    // and make note of anomolies in the features vector.
     for (int i=0; i<bytecount; i++) {
         auto j = i/4;
         auto k = i % 4;
-        if (m==CMAP) {
-            if (b[i] > 4)  { bs.at(j)[3-k] = 1; }
-            if (b[i]!=0 && b[i]!= 9) {
-                // anomoly
-                features.push_back({ line_code + "_" + to_string(i), b[i]});
-            }
-        } else {
-            if (b[i] != 0) {
-                bs.at(j)[3-k] = 1;
-                if (b[i] != (unsigned char)(-1)) {
-                    // anomoly
-                    features.push_back({ line_code + "_" + to_string(i), b[i]});
-                }
+        
+        char buf[3];
+        
+        if ((m==CMAP && b[i]>4) ||
+            (m!=CMAP && b[i]!= 0)) {
+            // LAND
+            bs.at(j)[3-k] = 1;
+        }
+        
+        if (b[i] != 0) {
+            if ((m==CMAP && b[i] != 9) ||
+                (m!=CMAP &&  b[i] != (unsigned char)(-1)) ) {
+                // Anomoly. Add to the features vector for printing after the main map.
+                sprintf(buf, "%02x", b[i]);
+                features.push_back({buf, b[i], line_code + "_" + to_string(i)});
             }
         }
     }
+    // Now compressing the single bits of the map into hex for printing.
     stringstream ss;
     for (int j=0; j<bytecount/4+1; j++) {
         ss << std::noshowbase << std::hex << bs[j].to_ulong();
@@ -353,10 +351,76 @@ string read_world_map(ifstream &in, int bytecount, translation_type m, string li
     
 }
 
+info_for_line_decode read_line(std::ifstream &in, std::ofstream &out, string line_code, translation_type method, int bytes_per_line, vector<info_for_line_decode> &features) {
+    info_for_line_decode i = {"", 0, line_code};  // Defaults.
+    char buffer[255] = "";
+    int size_of_string;
+    
+    switch (method) {
+        case TEXT0 : // Reads the string length, then the string
+            size_of_string = read_int(in);
+            if (size_of_string > 100) { out.close(); abort(); }
+            in.read((char *)& buffer, size_of_string);
+            i.value = buffer;
+            return i;
+        case TEXT8 : // Reads the string length, then the string, then 8 bytes of padding.
+            size_of_string = read_int(in);
+            if (size_of_string > 100) { out.close(); abort(); }
+            in.read((char *)& buffer, size_of_string);
+            i.value = buffer;
+            in.read(buffer, 8);       //  Padding
+            return i;
+        case INT :
+            i.v = read_int(in);
+            i.value = to_string(i.v);
+            return i;
+        case ZERO :
+            try {
+                i.value = read_zeros(in, bytes_per_line);
+                return i;
+            } catch(logic_error) {
+                out.close();
+                abort();
+            }
+        case BULK :
+            i.value = read_bulk_hex(in, bytes_per_line);
+            return i;
+        case HEX :
+            read_hex(in, i);   // Edits i
+            return i;
+        case FMAP :
+        case SMAP :
+        case CMAP :
+            i.value = read_world_map(in,bytes_per_line,method, line_code, features);
+            return i;
+        case BINARY :
+            read_binary(in, i);
+            return i;
+        case SHORT :
+            // set i.v
+            read_short(in, i);
+            return i;;
+        case mFLOAT :
+            i.value = read_mFloat(in);
+            return i;
+        case uFLOAT :
+            i.value = read_uFloat(in);
+            return i;
+        case CHAR :
+            read_char(in, i);
+            return i;
+        case LCHAR : // Not sure yet how this differs from char.
+            read_char(in, i);
+            return i;
+        default: ;
+    }
+    throw logic_error("Problem with line reading");
+}
+
 void unpack_section (section mysection, ifstream & in, ofstream & out, int offset) {
     if (mysection.name == "Log") { out << "# Ship's Log\n"; } // hack to match perl.
     
-    vector<feature> features;
+    vector<info_for_line_decode> features;
     
     // section: Ship_0_0
     for (int c=offset; c<mysection.count+offset;c++) {
@@ -426,87 +490,20 @@ void unpack_section (section mysection, ifstream & in, ofstream & out, int offse
             continue;
         }
         
+        // When we get here, it means that there was just one line of data to read,
+        // process, and print.
+        info_for_line_decode i = read_line(in, out, subsection, mysection.method, mysection.bytes_per_line, features);
+        if (is_world_map(mysection.method)) { i.line_code += "_293"; }
         
-        //// NOTE a big break here. The code above is for splitting a section, the code below is for reading a line.
+        print_pst_line (out, char_for_method.at(mysection.method) + to_string(mysection.bytes_per_line), i);
         
-        auto method = mysection.method;
-        auto bytes_per_line = mysection.bytes_per_line;
-        
-        string value;
-        char buffer[255] = "";
-        int size_of_string;
-        
-        switch (method) {
-            case TEXT0 : // Stores a length in chars, followed by the text, possibly followed by 0 padding.
-                size_of_string = read_int(in);
-                if (size_of_string > 100) { out.close(); abort(); }
-                in.read((char *)& buffer, size_of_string);
-                value = buffer;
-                break;
-            case TEXT8 : //size_of_string = read_int(in);
-                size_of_string = read_int(in);
-                if (size_of_string > 100) { out.close(); abort(); }
-                in.read((char *)& buffer, size_of_string);
-                value = buffer;
-                in.read(buffer, 8); // Padding
-                break;
-            case INT :
-                value = to_string(read_int(in));
-                break;
-            case ZERO :
-                try {
-                    value = read_zeros(in, bytes_per_line);
-                } catch(logic_error) {
-                    out.close();
-                    abort();
-                }
-                break;
-            case BULK :
-                value = read_bulk_hex(in, bytes_per_line);
-                break;
-            case HEX :
-                value = read_hex(in);
-                break;
-            case FMAP :
-            case SMAP :
-            case CMAP :
-                value = read_world_map(in,bytes_per_line,method, subsection, features);
-                break;
-            case BINARY :
-                value = read_binary(in);
-                break;
-            case SHORT :
-                value = read_short(in);
-                break;
-            case mFLOAT :
-                value = read_mFloat(in);
-                break;
-            case uFLOAT :
-                value = read_uFloat(in);
-                break;
-            case CHAR :
-                value = read_char(in);
-                break;
-            case LCHAR :
-                value = read_char(in);
-                break;
-            default:
-                break;
-        }
-        
-        // Another big break. From here down is printing the line.
-        if (is_world_map(method)) { subsection += "_293"; }
-        
-        print_pst_line (in, out, subsection, char_for_method.at(method) + to_string(bytes_per_line), value);
+        check_for_specials(in, subsection);  // Perhaps this could be moved out of the loop. Then it could handle the hack print too.
     }
+    
+    // world_map sections
     if (is_world_map(mysection.method)) {
         for (auto f : features) {
-            // Yes, this is the same as above. I need to refactor.
-            string translation = full_translate(f.line_code, to_string(f.v));
-            string comment = full_comment(f.line_code, to_string(f.v));
-            char buffer[3];
-            sprintf(buffer, "%02x", f.v);
-            out << f.line_code << "   : F1   :  " << buffer << "  :  " << comment << " " << translation << "\n";
+            print_pst_line(out, "F1", f);
         }
     }
 }

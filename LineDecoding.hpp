@@ -28,9 +28,12 @@ struct info_for_line_decode {
     std::string line_code;
 };
 // Master routines
-void print_pst_line (std::ifstream &in, std::ofstream &out, std::string &subsection, std::string method, std::string &value);
-std::string full_translate(std::string subsection, std::string value) ;
-std::string full_comment(std::string subsection, std::string value) ;
+void print_pst_line (std::ofstream &out, std::string , info_for_line_decode);
+void check_for_specials(std::ifstream &in, std::string line_code);
+
+
+std::string full_translate(info_for_line_decode) ;
+std::string full_comment(info_for_line_decode) ;
 
 std::string translate(translatable t, info_for_line_decode);
 std::string simple_translate (translatable t, int as_int);
