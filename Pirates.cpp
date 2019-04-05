@@ -79,7 +79,7 @@ const vector<section> section_vector = {
     {"Top10",            10,      28, },
     {"d",                 1,      36, ZERO},
     {"Villain",          28,      36, },
-    {"t",                 1,      120, },
+    {"t",                 8,      16, }, // Note that the first piece is actually shorter
     {"CityLoc",         128,      16, },
     {"CoastMap",        462,     293, CMAP},
     {"k",                 8,       4, INT},
@@ -142,6 +142,8 @@ map<string,translation_type> subsection_simple_decode = {
 // split up a section into multiple sections that may be of different or variable types and sizes.
 // Make sure the bytes add up to the size of the original section (this is checked at runtime).
 //
+// However, if you split a section into only ONE item, then it will permit you to change the size
+// (temporarily breaking the Dewey Decimal Rule).
 map<string,vector<subsection_info>> subsection_manual_decode = {
     {"Personal_51",   {{CHAR}, {ZERO,3}}},           // 4 = 1+3
     {"Personal_52",   {{BINARY}, {BULK,3}}},         // 4 = 1+3
@@ -159,7 +161,7 @@ map<string,vector<subsection_info>> subsection_manual_decode = {
     {"TreasureMap_x_68", {{BULK,1}, {BINARY,1}, {BULK,1}, {BINARY,1}}}, // 4 = 1+1+1=1
     {"Villain_x",     {{SHORT,2,10}, {INT,4}, {SHORT,2,6}}}, // 36 = 2*10 + 4 + 2*6
     {"CityLoc_x",     {{mFLOAT,4,2}, {HEX,4,2}}}, // 16 = 4*2 + 4*2
-    {"t",             {{BULK,8,1}, {BULK,16,7}}},
+    {"t_0",           {{BULK,8,1}}},   // 16 != 8. Breaking DDR.
     {"Top10_x",       {{INT,4,2}, {SHORT,2,10}}}, // 28 = 4*2 + 2*10
     {"Top10_x_1",     {{BINARY}, {ZERO,3}}},
 };
@@ -199,7 +201,7 @@ string find_file(string dir, string file, string suffix) {
     exit(1);
 }
 
-void unpack_section (section section, ifstream & in, ofstream & out, int offset=0);
+void unpack_section (section section, ifstream & in, ofstream & out, int offset=0, bool stopnow=false);
 
 void unpack_pg_to_pst(string pg_file, string pst_file) {
     ifstream pg_in = ifstream(pg_file, ios::binary);
@@ -417,7 +419,7 @@ info_for_line_decode read_line(std::ifstream &in, std::ofstream &out, string lin
     throw logic_error("Problem with line reading");
 }
 
-void unpack_section (section mysection, ifstream & in, ofstream & out, int offset) {
+void unpack_section (section mysection, ifstream & in, ofstream & out, int offset, bool stopnow) {
     if (mysection.name == "Log") { out << "# Ship's Log\n"; } // hack to match perl.
     
     vector<info_for_line_decode> features;
@@ -432,11 +434,13 @@ void unpack_section (section mysection, ifstream & in, ofstream & out, int offse
         // The subsection or subsection_x have higher priority in translating this line
         // than the parent section directive.
         
+        if(! stopnow) {
+            bool stopnext = false;
         if (subsection_simple_decode.count(subsection) || subsection_simple_decode.count(subsection_x)) {
             translation_type submeth = subsection_simple_decode.count(subsection) ?
             subsection_simple_decode.at(subsection) : subsection_simple_decode.at(subsection_x);
             
-            if (submeth != mysection.method) { // Avoids infinite loop.
+            //if (submeth != mysection.method) { // Avoids infinite loop.
                 // Take the the section.byte_count and divide
                 // it equally to set up the subsections.
                 int count = 1;
@@ -450,7 +454,6 @@ void unpack_section (section mysection, ifstream & in, ofstream & out, int offse
                     }
                 }
                 int suboffset = 0;
-                
                 if (count ==1) {
                     // If there is only one count for the subsection, then we aren't really splitting it up;
                     // we are changing the translation method of this particular line.
@@ -458,12 +461,13 @@ void unpack_section (section mysection, ifstream & in, ofstream & out, int offse
                     // But note the if above to avoid an infinite loop.
                     subsection = mysection.name;
                     suboffset = c;
+                    stopnext = true;
                 }
                 
                 struct::section sub = {subsection,count, size_for_method.at(submeth) , submeth };
-                unpack_section(sub, in, out, suboffset);
+                unpack_section(sub, in, out, suboffset, stopnext);
                 continue;
-            }
+           // }
         }
         
         if (subsection_manual_decode.count(subsection) || subsection_manual_decode.count(subsection_x)) {
@@ -473,23 +477,36 @@ void unpack_section (section mysection, ifstream & in, ofstream & out, int offse
             
             int suboffset = 0;
             int byte_count_check = 0;
+            int count = 0;
+            bool stopnext = false;
             for (auto subinfo : info) {
-                translation_type submeth = subinfo.method;
-                struct::section sub = {subsection,subinfo.multiplier, subinfo.byte_count , submeth };
-                // cerr << subsection << "," << subinfo.multiplier  << "," << subinfo.byte_count << "\n";
-                unpack_section(sub, in, out, suboffset);
-                suboffset += subinfo.multiplier;
+                count += subinfo.multiplier;
                 byte_count_check += subinfo.multiplier*subinfo.byte_count;
             }
-            if (byte_count_check != mysection.bytes_per_line) {
+            if (count == 1) {
+                subsection = mysection.name;
+                suboffset = c;
+                stopnext = true;
+            } else if (byte_count_check != mysection.bytes_per_line) {
                 cerr << "Error decoding line " << subsection << " subsections don't add up: " << byte_count_check << " != " << mysection.bytes_per_line << "\n";
                 out.close();
                 abort();
                 // It will probably crash later anyway.
             }
-            continue;
+                for (auto subinfo : info) {
+                    translation_type submeth = subinfo.method;
+                    struct::section sub = {subsection,subinfo.multiplier, subinfo.byte_count , submeth };
+                    
+                        // cerr << subsection << "," << subinfo.multiplier  << "," << subinfo.byte_count << "\n";
+                        unpack_section(sub, in, out, suboffset, stopnext);
+                        suboffset += subinfo.multiplier;
+                   
+                }
+                
+                continue; // Fall out of for loop on c, do not print a line.
+      
         }
-        
+        }
         // When we get here, it means that there was just one line of data to read,
         // process, and print.
         info_for_line_decode i = read_line(in, out, subsection, mysection.method, mysection.bytes_per_line, features);

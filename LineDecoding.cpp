@@ -596,6 +596,7 @@ map<string,decode_for_line> line_decode = {
     {"Villain_x_5",       {"Special Move",   SPECIAL_MOVE}},
     {"Villain_x_15",      {"Starting City",   CITYNAME}},
     {"Villain_x_16",      {"Destination City",   CITYNAME}},
+    {"t_7_3",             {"Starting Year"}},
     {"CityLoc_x_0",       {"x coord", CITY_BY_LINECODE}},
     {"CityLoc_x_1",       {"y coord",}},
     {"CityLoc_x_2",       {"pier direction", DIR}},
