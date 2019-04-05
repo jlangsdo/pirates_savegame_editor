@@ -258,7 +258,7 @@ string translate(translatable t, info_for_line_decode i) {
     // first and then return the value from the list. This is to cover the common case where the function
     // is for storing the value somewhere.
     
-    if (return_value != "") { return_value = "(" + return_value + ")"; }
+    if (return_value != "") { return_value = " (" + return_value + ")"; }
     return return_value;
 }
 
@@ -656,7 +656,9 @@ void augment_decoder_groups() {
         int pp = i%4;
         string line = "Personal_" + to_string(p) + "_" + to_string(pp);
         string comment = "1=" + translation_lists[ITEM][i] + ",    2=" + translation_lists[BETTER_ITEM][i];
-        line_decode[line] = {comment};
+        stringstream ss;
+        ss << std::left << std::setw(25) << "1=" + translation_lists[ITEM][i] + ", " << "2=" << translation_lists[BETTER_ITEM][i];
+        line_decode[line] = {ss.str()};
     }
     
     // These have lists in the comment where I also need the components of the lists separately.
@@ -688,7 +690,7 @@ string translate_date(info_for_line_decode i) { // Translate the datestamp into 
     stringstream st;
     
     st << std::put_time(std::gmtime(& myt), "%b %e, "); // month and day
-    string retval = st.str();
+    string retval = regex_replace(st.str(), regex("  "), " ");
     
     st.str("");   // Clear the stream.
     st << std::put_time(std::gmtime(& myt), "%Y\n");
@@ -738,13 +740,33 @@ void print_pst_line (std::ofstream &out, string typecode, info_for_line_decode i
     string comment = full_comment(i);
     
     
-    // Matching bugs in perl script
-    // -1 -> "4294967295";
+    // Perl script reports 4-byte integers as unsigned.
+    // This is misleading, they act more like signed, so I am holding them
+    // as signed internally, but printing unsigned to match.
     if (typecode=="V4" && i.v < 0) {
         i.value = to_string((unsigned int)i.v);
     }
     
-    out << i.line_code << "   : " <<  typecode ;
-    out << "   :   " << i.value << "   :   ";
-    out << comment << " " << translation << "\n";
+    // Matching spaces from perl.
+    int s = 8;
+    int lw = (int)i.line_code.length();
+    int width = s * ((lw/s)+1);
+    if( typecode == "F1" ) { width = lw+1; }
+    out << std::left << setw(width) << i.line_code << " : " ;
+    s = 3;
+    lw = (int)typecode.length();
+    width = s * ((lw/s)+1);
+    if( typecode == "F1" ) { width = lw; }
+    out << setw(width) << typecode << " : ";
+    s = 1;
+    lw = (int)i.value.length();
+    auto tc_size = stoi(regex_replace(typecode, regex("^\\D+"), ""));
+    if (tc_size <= 4 && regex_match(typecode.substr(0,1),regex("[VsCHc]"))) { s = 9; }
+    if (typecode.substr(0,1) == "t") { s = 20;}
+    width = s*((lw/s)+1);
+    if( typecode == "F1" ) { width = lw; }
+    out << std::left << setw(width) << i.value << " :";
+    if (typecode != "F1" || (comment.size()==0 && translation.size()==0) ) { out << " "; }
+    out << comment << translation << "\n";
+   
 }

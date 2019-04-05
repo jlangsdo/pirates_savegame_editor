@@ -299,7 +299,10 @@ int read_int(ifstream & in) { // Read 4 bytes from in (little endian) and conver
 
 string read_uFloat(ifstream &in) {
     auto raw = read_int(in);
-    return to_string(double(raw)/1000000);
+    if (raw == 0) { return "  0.000000"; }
+    stringstream ss;
+    ss << std::right << std::fixed << setprecision(6) << setw(10) << double(raw)/1000000;
+    return ss.str();
 }
 
 
