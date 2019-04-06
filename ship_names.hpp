@@ -9,29 +9,12 @@
 #ifndef ship_names_hpp
 #define ship_names_hpp
 
-#include <stdio.h>
-#include <vector>
-#include <map>
 #include <string>
-#include "LineDecoding.hpp"
-void load_pirate_shipnames();
+#include "Pirates.hpp"
 
-std::string translate_shipname(info_for_line_decode);
+void load_pirate_shipnames();
 void save_last_flag(std::string);
 std::string save_last_shiptype(info_for_line_decode);
-
-const std::vector<std::string> shipname_type_by_class = {
-    "MERCHANT SHIPS", "PIRATES",        "WARSHIPS",
-    "MERCHANT SHIPS", "MERCHANT SHIPS", "MERCHANT SHIPS",
-    "WARSHIPS",       "WARSHIPS",       "MERCHANT SHIPS",
-    
-    "MERCHANT SHIPS", "WARSHIPS",       "WARSHIPS",
-    "MERCHANT SHIPS", "MERCHANT SHIPS", "MERCHANT SHIPS",
-    "WARSHIPS",       "WARSHIPS",       "MERCHANT SHIPS",
-    
-    "MERCHANT SHIPS", "WARSHIPS",       "WARSHIPS",
-    "MERCHANT SHIPS", "MERCHANT SHIPS", "MERCHANT SHIPS",
-    "WARSHIPS",       "WARSHIPS",       "MERCHANT SHIPS"
-};
+std::string translate_shipname(info_for_line_decode);
 
 #endif /* ship_names_hpp */

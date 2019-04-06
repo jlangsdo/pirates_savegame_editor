@@ -7,6 +7,8 @@
 //
 
 #include "LineDecoding.hpp"
+#include "LineReading.hpp"   // For the read_int routine, needed for starting_year.
+#include "ship_names.hpp"   // ship_names is a subset of linedecoding.
 #include <stdio.h>
 #include <map>
 #include <vector>
@@ -19,41 +21,27 @@
 #include <ctime>
 #include <iomanip>
 #include <iostream>
-#include "ship_names.hpp"
 #include <fstream>
 #include "Pirates.hpp"
 using namespace std;
 
 // This file handles printing a line of the pst file - decoding the comment and translation,
-// based on the line_code.
-
-
-
-// The savegame file has variable length parts at the beginning and end,
-// and a huge fixed length section in the middle. Once we hit the start of the fixed length section,
-// it makes sense to peek far ahead to read the starting year, so that it can be used in all of the datestamps.
-const string start_of_fixed_length_section = "Personal_0";
-int starting_year;
-void store_startingyear(ifstream & in) {
-    constexpr int jump_dist = 887272;
-    in.seekg(jump_dist, ios_base::cur);
-    starting_year = read_int(in);
-    in.seekg(-jump_dist-4, ios_base::cur);
-}
+// and getting the spacing right to match the perl version of unpacking.
 
 const int number_of_true_cities = 44; // Cities after this number are settlements, indian villages, Jesuit missions, or pirate bases.
+int starting_year;
 
 enum translatable : char {
     // All translatable enums should be mapped in the translation_lists
     NIL, NONE, RANK, DIFFICULTY, NATION, FLAG, SKILL, SPECIAL_MOVE, SHIP_TYPE,
-    DISPOSITION, BEAUTY, SHORT_UPGRADES, LONG_UPGRADES, CITYNAME, DIRECTION,
+    DISPOSITION, BEAUTY, SHORT_UPGRADES, LONG_UPGRADES, CITYNAME, DIR16,
     SHORT_DIRECTION, PIRATE,
     EVENT, EVENTS3, EVENTS15, EVENTS32, EVENTS64,
     PURPOSE, PURPOSE0, PURPOSE30, PURPOSE40,
     WEALTH_CLASS, POPULATION_CLASS, SOLDIERS, FLAG_TYPE, SPECIALIST,
     ITEM, BETTER_ITEM, PIRATE_HANGOUT,
     // or in the translation_functions
-    DIR, SHIPNAME, STORE_CITYNAME, DATE, FOLLOWING, CITY_BY_LINECODE, WEALTH, POPULATION,
+    DIRECTION, SHIPNAME, STORE_CITYNAME, DATE, FOLLOWING, CITY_BY_LINECODE, WEALTH, POPULATION,
     POPULATION_TYPE, ACRES, LUXURIES_AND_SPICES, BEAUTY_AND_SHIPWRIGHT, FURTHER_EVENT, SHIP_SPECIALIST,
     PEACE_AND_WAR, DATE_AND_AGE, TREASURE_MAP, LANDMARK,
     // If it is not mapped in either, that is not an error: it is hook for future code).
@@ -62,7 +50,7 @@ enum translatable : char {
 
 
 // Utilities?
-int read_hex (char c) { // Reads a char ascii value, returns digital equivalent when read as hex.
+int read_as_hex (char c) { // Reads a char ascii value, returns digital equivalent when read as hex.
     int res = (int)(c-'0');
     if (res >= 0 && res <= 9) { return res;}
     
@@ -81,15 +69,10 @@ int suffix_from_linecode (string line_code) { // Given Log_1_4, returns 4
     string line = regex_replace(line_code, regex("^.*_"), "");
     return stoi(line);
 }
-    
-std::string str_tolower(std::string s) {
-    std::transform(s.begin(), s.end(), s.begin(),
-                   [](unsigned char c){ return std::tolower(c); } // correct
-                   );
-    return s;
-}
 
-
+// These lists are most of the strings for 'translation' - explaining what the numerical value
+// on a particular line stands for. strings go here if they are indexed by a small number in the savegame file.
+// Some additional text is coded into the translation functions below.
 map <translatable, vector<string>> translation_lists = {
     { RANK,
         { "No Rank", "Letter_of_Marque", "Captain", "Major", "Colonel",
@@ -117,7 +100,7 @@ map <translatable, vector<string>> translation_lists = {
     { LONG_UPGRADES, {
         "copper plating", "cotton sails", "triple hammocks", "iron scantlings",
         "chain shot", "grape shot", "fine grain powder", "bronze cannon"}},
-    { DIRECTION, {"N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW", "N"}},
+    { DIR16, {"N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW", "N"}},
     { SHORT_DIRECTION, {"N", "NE", "E", "SE", "S", "SW", "W", "NW", "N"}},
     // CITYNAME is loaded during the reading of the CityName section, for use in other sections
     { CITYNAME, vector<string> (128) },
@@ -153,7 +136,7 @@ map <translatable, vector<string>> translation_lists = {
 map <translatable, string (*)(info_for_line_decode i)> translation_functions = {
     { SHIPNAME, translate_shipname },
     { SHIP_TYPE, save_last_shiptype }, // Is this really that much better than a switch/case statement?
-    { DIR, translate_dir },
+    { DIRECTION, translate_dir },
     { STORE_CITYNAME, store_cityname },
     { FLAG, store_flag },
     { DATE, translate_date },
@@ -224,18 +207,13 @@ string simple_translate (translatable t, int as_int) {
             switch (t) { // Perhaps I need a separate array for values at -1, or add one before accessing all arrays.
                 case SHIP_TYPE    : return "NIL";
                 case SPECIAL_MOVE : return "NONE";
-               // case CITYNAME     : return "N/A";
+                    // case CITYNAME     : return "N/A";
                 default           : return "";
             }
         }
     }
     return "";
 }
-//string simple_translate (translatable t, string value) {    return simple_translate(t, (int)stoi(value)); }
-
-
-
-
 
 string translate(translatable t, info_for_line_decode i) {
     if (t == NIL) { return ""; }
@@ -303,11 +281,11 @@ string translate_dir (info_for_line_decode i) {  // Reads the hex string in valu
     char first_char = i.value.at(0);             // rather than the integer v.
     char second_char = i.value.at(1);
     
-    int dir = read_hex(first_char);
-    int next_digit = read_hex(second_char);
+    int dir = read_as_hex(first_char);
+    int next_digit = read_as_hex(second_char);
     if (next_digit > 7) { dir++; }
     
-    return simple_translate(DIRECTION, dir);
+    return simple_translate(DIR16, dir);
 }
 
 string translate_event_flags(info_for_line_decode i) {
@@ -459,7 +437,9 @@ string translate_beauty_and_shipwright(info_for_line_decode i) {
     return retval;
 }
 
-// These do not have to be in the order that they are in the file, but it makes things easier to read if they are.
+// These are the list of comments and translations - explaining what a line refers to.
+// Comments depend on the line_code, not the value there; translations depend on both.
+// This map does not have to be in the order that the lines appear in the savegame file, but it makes things easier to maintain if it is.
 map<string,decode_for_line> line_decode = {
     {"Intro_1",        {"You are here x"}},
     {"Intro_2",        {"You are here y"}},
@@ -490,7 +470,7 @@ map<string,decode_for_line> line_decode = {
     {"Personal_45_1",  {"months at sea"}},
     {"Personal_46_0",  {"Relatives found"}},
     {"Personal_46_1",  {"Lost cities found"}},
-    // {"Personal_52_0",  {"cook/quartermaster/navigator/surgeon/gunner/cooper/sailmaker/carpenter"}}, // do this automatically below.
+    // {"Personal_52_0",  {"cook/quartermaster/navigator/surgeon/gunner/cooper/sailmaker/carpenter"}}, // Done automatically below.
     //    {"Ship_0_0_0", {"Player Flagship Type", SHIP_TYPE }},   // TODO: Put this back in later. Perl code has a bug that makes this not work.
     {"Ship_x_0_0", {"Ship Type",       SHIP_TYPE }},
     {"Ship_x_0_1", {"Disposition",     DISPOSITION }},
@@ -498,14 +478,14 @@ map<string,decode_for_line> line_decode = {
     {"Ship_x_0_4", {"Target Ship"}},
     {"Ship_x_0_6", {"x Coordinate"}},
     {"Ship_x_1_0", {"y Coordinate"}},
-    {"Ship_x_1_1", {"direction",       DIR  }},
+    {"Ship_x_1_1", {"direction",       DIRECTION  }},
     {"Ship_x_1_2", {"speed"}},
     {"Ship_x_2_0", {"% Damage Sails"}},
     {"Ship_x_2_1", {"% Damage Hull"}},
     {"Ship_x_2_2", {"",                 FOLLOWING  }},
     {"Ship_x_2_3", {"Crew aboard"}},
     {"Ship_x_2_4", {"Cannon aboard"}},
-    // {"Ship_x_2_6_0", {"upgrades bronze/powder/grape/chain/scantlings/hammocks/sails/copper"}}, // do this automatically below
+    // {"Ship_x_2_6_0", {"upgrades bronze/powder/grape/chain/scantlings/hammocks/sails/copper"}}, // Done automatically below
     {"Ship_x_2_7", {"Name code",        SHIPNAME  }},//
     {"Ship_x_3_0", {"Gold aboard"}},
     {"Ship_x_3_1", {"Food aboard"}},
@@ -564,7 +544,7 @@ map<string,decode_for_line> line_decode = {
     {"Log_x_10",         {"DateStamp", DATE}},
     {"Log_x_11",         {"x coordinate", NONE}},
     {"Log_x_12",         {"y coordinate", NONE}},
-   // e_1_0 might be a bitstring. 16 for apprentice
+    // e_1_0 might be a bitstring. 16 for apprentice
     {"e_x_x",             {"", PEACE_AND_WAR}},
     {"e_23_7",            {"Date", DATE_AND_AGE}},
     {"Quest_x_0",         {"30 for wanted criminal, 10 for escort"}},
@@ -599,12 +579,11 @@ map<string,decode_for_line> line_decode = {
     {"t_7_3",             {"Starting Year"}},
     {"CityLoc_x_0",       {"x coord", CITY_BY_LINECODE}},
     {"CityLoc_x_1",       {"y coord",}},
-    {"CityLoc_x_2",       {"pier direction", DIR}},
-    {"CityLoc_x_3",       {"fort direction", DIR}},
+    {"CityLoc_x_2",       {"pier direction", DIRECTION}},
+    {"CityLoc_x_3",       {"fort direction", DIRECTION}},
     {"CoastMap_x_x",      {"", LANDMARK}},
     {"SailingMap_x_x",    {"", LANDMARK}},
     {"FeatureMap_x_x",    {"", LANDMARK}},
-    
     {"Top10_x_0",         {"Gold Plundered"}},
     {"Top10_x_1_0",       {"status ?/D/D/?/?/D/D/treasure_found  (D bits went to 1 on capture)"}},
     {"Top10_x_11",        {"Unique Items"}},
@@ -614,15 +593,16 @@ map<string,decode_for_line> line_decode = {
     {"Top10_x_7",         {"Ships Captured"}},
     {"LandingParty_0_0",  {"x coordinate"}},
     {"LandingParty_1_0",  {"y coordinate"}},
-    {"LandingParty_3_0",  {"Direction", DIR}},
+    {"LandingParty_3_0",  {"Direction", DIRECTION}},
     {"Skill_0",           { "", SKILL}},
-
+    
 };
 
 
 void augment_from_translation_list(translatable t, string line_code, string prefix = "", string delimiter = "/") {
     // Upgrade and Specialist lists are accessed in the translation_lists because they can appear in decodes.
     // BUT they also appear in a binary decode where I need to see all of them in a line in reverse order.
+    // To keep the comment in sync, autogenerate it from the list.
     string sp = "";
     for (auto up : translation_lists.at(t)) {
         sp = delimiter + up + sp;
@@ -632,25 +612,16 @@ void augment_from_translation_list(translatable t, string line_code, string pref
 }
 
 void augment_cross_translation_list(translatable to, translatable from, int offset) {
-    // The EVENT translation list would have too many holes, so build it up one part at a time.
+    // Some translation lists would have too many holes, so build it up one part at a time.
     for (int i=0; i<translation_lists.at(from).size(); i++) {
-        string from_val = translation_lists.at(from)[i];
-        if (from_val != "") {
-            translation_lists[to][i+offset] = from_val;
-            // For debug.
-            // cerr << "Set EVENTS " << i+offset << " to " <<  from_val << "\n";
-        }
+        translation_lists[to][i+offset] = translation_lists.at(from)[i];
     }
 }
 
 void augment_decoder_groups() {
-    // The items need comments in the decoder group that are all the same,
-    // so I'm adding these programmatically. This is sort of like a translation function,
-    // but it puts in a comment on each one which is constant regardless of the value.
+    // Some decoder groups have "some assembly required".
     //
-    // This is better than a translate for the items because you want to be able to see the item names
-    // for each line, whether you have them or not.
-    //
+    // The items comments need to mention both items controlled by each line.
     for (int i=0; i<translation_lists[ITEM].size(); i++) {
         int p = 47 + (i/4);
         int pp = i%4;
@@ -665,7 +636,7 @@ void augment_decoder_groups() {
     augment_from_translation_list(SPECIALIST, "Personal_52_0");
     augment_from_translation_list(SHORT_UPGRADES, "Ship_x_2_6_0", "upgrades ");
     
-    // This translation_list has blanks, so split it into different lists.
+    // This translation_list has too many blanks, so split it into different lists.
     augment_cross_translation_list(EVENT, EVENTS3, 3);
     augment_cross_translation_list(EVENT, EVENTS15, 15);
     augment_cross_translation_list(EVENT, EVENTS32, 32);
@@ -702,9 +673,8 @@ string translate_date(info_for_line_decode i) { // Translate the datestamp into 
 }
 
 string full_translate(info_for_line_decode i) {
-    
     string temp_line_code = i.line_code;
-    while(true) { // Improved, now handles Log_x_x and we don't need to pass subsection_x.
+    while(true) { // Translate based on Log_5_6, Log_x_6, or Log_x_x
         if (line_decode.count(temp_line_code) && line_decode.at(temp_line_code).t != NIL) {
             return translate(line_decode.at(temp_line_code).t, i);
         } else {
@@ -718,7 +688,7 @@ string full_translate(info_for_line_decode i) {
 
 string full_comment(info_for_line_decode i) {
     string temp_line_code = i.line_code;
-    while(true) { // Improved, now handles Log_x_x and we don't need to pass subsection_x.
+    while(true) { // Comment based on Log_5_6, Log_x_6, or Log_x_x
         if (line_decode.count(temp_line_code)) {
             return line_decode.at(temp_line_code).comment;
         } else {
@@ -729,10 +699,27 @@ string full_comment(info_for_line_decode i) {
     return "";
 }
 
-void check_for_specials(std::ifstream &in, string line_code) {
-    if (line_code == start_of_fixed_length_section) {
-        store_startingyear(in);
+void check_for_specials(std::ifstream &in, std::ofstream &out, string line_code) {
+    // The savegame file has variable length parts at the beginning and end,
+    // and a huge fixed length section in the middle. Once we hit the start of the fixed length section,
+    // it makes sense to peek far ahead to read the starting year, so that it can be used in all of the datestamps.
+    if (line_code == "Personal") {
+        constexpr int jump_dist = 887276;
+        in.seekg(jump_dist, ios_base::cur);
+        starting_year = read_int(in);
+        in.seekg(-jump_dist-4, ios_base::cur);
     }
+    // The perl code had an extra comment here.
+    if (line_code == "Log") {
+        out << "# Ship's Log\n";
+    }
+}
+
+void print_field (std::ofstream &out, string value, int default_width) {
+    // Prints a field with appropriate spacing to keep the colons lined up for similar lines with different width values.
+    int lw = (int)value.length();
+    int width = default_width * ((lw/default_width)+1);
+    out << std::left << setw(width) << value << " : " ;
 }
 
 void print_pst_line (std::ofstream &out, string typecode, info_for_line_decode i) {
@@ -747,26 +734,24 @@ void print_pst_line (std::ofstream &out, string typecode, info_for_line_decode i
         i.value = to_string((unsigned int)i.v);
     }
     
-    // Matching spaces from perl.
-    int s = 8;
-    int lw = (int)i.line_code.length();
-    int width = s * ((lw/s)+1);
-    if( typecode == "F1" ) { width = lw+1; }
-    out << std::left << setw(width) << i.line_code << " : " ;
-    s = 3;
-    lw = (int)typecode.length();
-    width = s * ((lw/s)+1);
-    if( typecode == "F1" ) { width = lw; }
-    out << setw(width) << typecode << " : ";
-    s = 1;
-    lw = (int)i.value.length();
-    auto tc_size = stoi(regex_replace(typecode, regex("^\\D+"), ""));
-    if (tc_size <= 4 && regex_match(typecode.substr(0,1),regex("[VsCHc]"))) { s = 9; }
-    if (typecode.substr(0,1) == "t") { s = 20;}
-    width = s*((lw/s)+1);
-    if( typecode == "F1" ) { width = lw; }
-    out << std::left << setw(width) << i.value << " :";
-    if (typecode != "F1" || (comment.size()==0 && translation.size()==0) ) { out << " "; }
-    out << comment << translation << "\n";
-   
+    if (typecode=="F1") {
+        // Spacing is different but simpler for F1 Feature case.
+        out << i.line_code << "  : " << typecode << " : " << i.value << " :";
+        if (comment=="" && translation=="") { out << " "; }
+        out << comment << translation << "\n";
+    } else {
+        // Regular spacing method
+        print_field(out, i.line_code, 8);
+        print_field(out, typecode, 3);
+        
+        int value_width = 1;
+        auto tc_size = stoi(regex_replace(typecode, regex("^\\D+"), ""));
+        if (tc_size <= 4 && regex_match(typecode.substr(0,1),regex("[VsCHc]"))) { value_width = 9; }
+        if (typecode.substr(0,1) == "t") { value_width = 20;}
+        print_field(out, i.value, value_width);
+        
+        out << comment << translation << "\n";
+    }
+    
+    
 }

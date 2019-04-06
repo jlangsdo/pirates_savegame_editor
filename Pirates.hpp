@@ -9,24 +9,24 @@
 #ifndef Pirates_hpp
 #define Pirates_hpp
 
-#include <stdio.h>
+// This file holds the structs and enums used to pass data betweeen the different modules,
+// so the modules do not need to include one another's files.
+
 #include <string>
-#include <fstream>
-#include <string>
 
-// Filename suffixes
-const std::string pg  = "pirates_savegame";
-const std::string pst = "pst";
+enum translatable : char;
+enum translation_type : char { TEXT0, TEXT8, HEX, INT, BINARY, SHORT, CHAR, LCHAR, mFLOAT, uFLOAT, FMAP, SMAP, CMAP, BULK, ZERO };
 
-std::string find_file(std::string dir, std::string file, std::string suffix);
-void augment_decoder_groups();
-void unpack_pg_to_pst(std::string pg, std::string pst);
-void pack_pst_to_pg(std::string pst, std::string pg);
-void store_startingyear(std::ifstream & in) ;
+struct decode_for_line {
+    std::string comment = "";
+    translatable t ;
+};
 
-enum translation_type : char;
-int read_int(std::ifstream & in);
-void print_one_line(std::ofstream & out, std::string line_code, translation_type method, int bytes_per_line, std::string value);
-void print_one_line(std::ofstream & out, std::string line_code, translation_type method, int bytes_per_line, int v);
+struct info_for_line_decode {
+    std::string value;
+    int v;                // value reduced to an integer
+    std::string line_code;
+};
+
 
 #endif /* Pirates_hpp */

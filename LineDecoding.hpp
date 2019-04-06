@@ -15,23 +15,12 @@
 #include <string>
 #include "Pirates.hpp"
 
-enum translatable : char;
+// Public routines
+void print_pst_line (std::ofstream &out, std::string, info_for_line_decode);
+void check_for_specials(std::ifstream &in, std::ofstream &out, std::string line_code);
+void augment_decoder_groups();
 
-struct decode_for_line {
-    std::string comment = "";
-    translatable t ;
-};
-
-struct info_for_line_decode {
-    std::string value;
-    int v;                // value reduced to an integer
-    std::string line_code;
-};
-// Master routines
-void print_pst_line (std::ofstream &out, std::string , info_for_line_decode);
-void check_for_specials(std::ifstream &in, std::string line_code);
-
-
+// Internal routines.
 std::string full_translate(info_for_line_decode) ;
 std::string full_comment(info_for_line_decode) ;
 
@@ -40,10 +29,9 @@ std::string simple_translate (translatable t, int as_int);
 std::string simple_translate (translatable t, std::string value);
 
 // Utilities?
-int read_hex (char c);
+int read_as_hex (char c);
 int index_from_linecode (std::string);
 int suffix_from_linecode (std::string);
-std::string str_tolower(std::string);
 
 // If this were a class, I would mark these private:
 // Stubs for routines called by translation_functions

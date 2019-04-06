@@ -7,12 +7,27 @@
 //
 
 #include "ship_names.hpp"
-#include "LineDecoding.hpp"
+#include "Pirates.hpp"
 #include <string>
 #include <sstream>
 #include <iostream>
+#include <map>
 #include <regex>
 using namespace std;
+
+const std::vector<std::string> shipname_type_by_class = {
+    "MERCHANT SHIPS", "PIRATES",        "WARSHIPS",
+    "MERCHANT SHIPS", "MERCHANT SHIPS", "MERCHANT SHIPS",
+    "WARSHIPS",       "WARSHIPS",       "MERCHANT SHIPS",
+    
+    "MERCHANT SHIPS", "WARSHIPS",       "WARSHIPS",
+    "MERCHANT SHIPS", "MERCHANT SHIPS", "MERCHANT SHIPS",
+    "WARSHIPS",       "WARSHIPS",       "MERCHANT SHIPS",
+    
+    "MERCHANT SHIPS", "WARSHIPS",       "WARSHIPS",
+    "MERCHANT SHIPS", "MERCHANT SHIPS", "MERCHANT SHIPS",
+    "WARSHIPS",       "WARSHIPS",       "MERCHANT SHIPS"
+};
 
 string last_flag = "";
 void save_last_flag(string flag) { last_flag = flag;   }
@@ -660,11 +675,11 @@ Tiger, M
 Victory, M
 )";
 
-
-
 map <string, vector<string>> shipnames_list;
 
 void load_pirate_shipnames() {
+    // Load all of the shipnames from the big string above and use them to populate
+    // a map so that shipnames can be looked up for decoding.
     stringstream data = stringstream(dump_of_shipnames);
     string aline;
     string shipclass = "";
@@ -674,13 +689,10 @@ void load_pirate_shipnames() {
             shipnames_list[shipclass] = {};
         } else if (shipclass != "") {
             // Discard gender of ships (, M).
-            // That was in the dump for languages other than English.
+            // (That was in the dump from SMP because SMP supports languages other than English.)
             string name = regex_replace(aline, regex(",.*"),"");
             shipnames_list[shipclass].push_back(name);
         }
-    }
-    for (auto sclass : shipnames_list) {
-        //    cerr << "Loaded " << sclass.second.size() << " ship names for class " << sclass.first << "\n";
     }
 }
 
@@ -688,8 +700,8 @@ string translate_shipname(info_for_line_decode i) {
     if (last_flag == "") { return "NIL"; }
     if (last_shiptype < 0 || last_shiptype > shipname_type_by_class.size()) { return "NIL"; }
 
-    // Assemble the shipname_group a combination of the flag and shiptype,
-    // to know which list of shipnames to use.
+    // Assemble the shipname_group a combination of the flag and shipname_group
+    // to know which list of shipnames to use - merchant, warship, or pirate.
     string shipname_group = last_flag + " " + shipname_type_by_class.at(last_shiptype);
     std::transform(shipname_group.begin(), shipname_group.end(),shipname_group.begin(), ::toupper);
     
@@ -699,12 +711,11 @@ string translate_shipname(info_for_line_decode i) {
     shipname_group = regex_replace(shipname_group, regex("^PIRATES.*"), "ENGLISH PIRATES");
     shipname_group = regex_replace(shipname_group, regex("^INDIAN.*"), "SPANISH MERCHANT SHIPS");
     
-    int as_int = stoi(i.value);
     if (shipnames_list.count(shipname_group)) {
         vector<string> & list = shipnames_list.at(shipname_group);
-        if (as_int >= 0 && as_int < list.size()) {
-            if (list.at(as_int).size() > 0) {
-                return list.at(as_int);
+        if (i.v >= 0 && i.v < list.size()) {
+            if (list.at(i.v).size() > 0) {
+                return list.at(i.v);
             }
         }
     } else {

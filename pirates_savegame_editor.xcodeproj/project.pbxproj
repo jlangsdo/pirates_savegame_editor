@@ -9,8 +9,9 @@
 /* Begin PBXBuildFile section */
 		153F2B9A224EC78E00CCA927 /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 153F2B99224EC78E00CCA927 /* main.cpp */; };
 		15472B2C2253EDBD00858D2F /* LineDecoding.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 15472B2A2253EDBD00858D2F /* LineDecoding.cpp */; };
+		156371F522581CC000EB4167 /* SectionSplitting.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 156371F322581CC000EB4167 /* SectionSplitting.cpp */; };
+		156371F822581E1100EB4167 /* LineReading.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 156371F622581E1100EB4167 /* LineReading.cpp */; };
 		15874C5722526BD60046F95F /* ship_names.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 15874C5522526BD60046F95F /* ship_names.cpp */; };
-		158A9BEA224F95210062534D /* Pirates.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 158A9BE8224F95210062534D /* Pirates.cpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -30,9 +31,12 @@
 		153F2B99224EC78E00CCA927 /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 		15472B2A2253EDBD00858D2F /* LineDecoding.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = LineDecoding.cpp; sourceTree = "<group>"; };
 		15472B2B2253EDBD00858D2F /* LineDecoding.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = LineDecoding.hpp; sourceTree = "<group>"; };
+		156371F322581CC000EB4167 /* SectionSplitting.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = SectionSplitting.cpp; sourceTree = "<group>"; };
+		156371F422581CC000EB4167 /* SectionSplitting.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = SectionSplitting.hpp; sourceTree = "<group>"; };
+		156371F622581E1100EB4167 /* LineReading.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = LineReading.cpp; sourceTree = "<group>"; };
+		156371F722581E1100EB4167 /* LineReading.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = LineReading.hpp; sourceTree = "<group>"; };
 		15874C5522526BD60046F95F /* ship_names.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ship_names.cpp; sourceTree = "<group>"; };
 		15874C5622526BD60046F95F /* ship_names.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = ship_names.hpp; sourceTree = "<group>"; };
-		158A9BE8224F95210062534D /* Pirates.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Pirates.cpp; sourceTree = "<group>"; };
 		158A9BE9224F95210062534D /* Pirates.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = Pirates.hpp; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -53,8 +57,11 @@
 				15472B2A2253EDBD00858D2F /* LineDecoding.cpp */,
 				15472B2B2253EDBD00858D2F /* LineDecoding.hpp */,
 				15874C5522526BD60046F95F /* ship_names.cpp */,
+				156371F322581CC000EB4167 /* SectionSplitting.cpp */,
+				156371F422581CC000EB4167 /* SectionSplitting.hpp */,
 				15874C5622526BD60046F95F /* ship_names.hpp */,
-				158A9BE8224F95210062534D /* Pirates.cpp */,
+				156371F622581E1100EB4167 /* LineReading.cpp */,
+				156371F722581E1100EB4167 /* LineReading.hpp */,
 				158A9BE9224F95210062534D /* Pirates.hpp */,
 				153F2B98224EC78E00CCA927 /* pirates_savegame_editor */,
 				153F2B97224EC78E00CCA927 /* Products */,
@@ -133,9 +140,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				158A9BEA224F95210062534D /* Pirates.cpp in Sources */,
+				156371F522581CC000EB4167 /* SectionSplitting.cpp in Sources */,
 				153F2B9A224EC78E00CCA927 /* main.cpp in Sources */,
 				15472B2C2253EDBD00858D2F /* LineDecoding.cpp in Sources */,
+				156371F822581E1100EB4167 /* LineReading.cpp in Sources */,
 				15874C5722526BD60046F95F /* ship_names.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
