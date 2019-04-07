@@ -19,71 +19,6 @@ using namespace std;
 // This file includes the functions for reading one line of text according to a translation_method,
 // and returning the result as a string value (and optionally an integer value for a translated comment).
 
-void read_hex(ifstream & in, info_for_line_decode & i) { // Read 4 bytes from in and report in hex
-    char b[4];
-    in.read((char*)&b, sizeof(b));
-    char buffer[255];
-    for (int j=3;j>=0;j--) {
-        sprintf(buffer, "%02X", (unsigned char)b[j]);
-        i.value += buffer;
-        if (j>0) i.value += '.';
-    }
-    i.v = (int)b[3];
-}
-
-string read_bulk_hex(ifstream & in, int bytecount) { // Read bytecount bytes from in and report in one big bulk hex
-    char b[bytecount];
-    in.read((char*)&b, bytecount);
-    string res;
-    char buffer[20];
-    for (int i=0;i<bytecount;i++) {
-        sprintf(buffer, "%02X", (unsigned char)b[i]);
-        res += buffer;
-    }
-    return str_tolower(res);
-}
-
-std::string str_tolower(std::string s) {
-    std::transform(s.begin(), s.end(), s.begin(),
-                   [](unsigned char c){ return std::tolower(c); } // correct
-                   );
-    return s;
-}
-
-string read_zeros(ifstream & in, int bytecount) { // Read bytecount bytes from in that should all be zero.
-    char b[bytecount];
-    in.read((char*)&b, bytecount);
-    for (int i=0;i<bytecount;i++) {
-        if (b[i]!= 0) {
-            throw logic_error("Found non-zeros");
-        }
-    }
-    return "zero_string";
-}
-
-
-void read_binary(ifstream & in, info_for_line_decode & i) { // Read 1 byte from in and report as binary string
-    char b;
-    in.read((char*)&b, sizeof(b));
-    std::bitset<8> asbits(b);
-    i.value = asbits.to_string();
-    i.v = (int)b;
-}
-
-void read_char(ifstream & in, info_for_line_decode & i) { // Read 1 byte from in and report as an int string
-    char b;
-    in.read((char*)&b, sizeof(b));
-    i.value = to_string(b);
-    i.v = (int)b;
-}
-
-void read_short(ifstream &in, info_for_line_decode & i) { // Read 2 bytes as a signed int and return as string
-    char b[2];
-    in.read((char*)&b, sizeof(b));
-    i.v = int((unsigned char)(b[0]) | (char)(b[1]) << 8);
-    i.value = to_string(i.v);
-}
-
 int read_int(ifstream & in) { // Read 4 bytes from in (little endian) and convert to integer
     char b[4];
     in.read((char*)&b, sizeof(b));
@@ -94,24 +29,6 @@ int read_int(ifstream & in) { // Read 4 bytes from in (little endian) and conver
     return B;
 }
 
-
-string read_uFloat(ifstream &in) {
-    auto raw = read_int(in);
-    if (raw == 0) { return "  0.000000"; }
-    stringstream ss;
-    ss << std::right << std::fixed << setprecision(6) << setw(10) << double(raw)/1000000;
-    return ss.str();
-}
-
-
-string read_mFloat(ifstream &in) {
-    auto raw = read_int(in);
-    string retstring = to_string(double(raw)/1000);
-    // backward compatibility to match perl:
-    retstring = regex_replace(retstring, regex("000$"), "");
-    if (retstring == "0.000") { retstring = "0"; }
-    return retstring;
-}
 
 string read_world_map(ifstream &in, int bytecount, translation_type m, string line_code, vector<info_for_line_decode> & features) {
     unsigned char b[600];
@@ -155,67 +72,85 @@ string read_world_map(ifstream &in, int bytecount, translation_type m, string li
 }
 
 info_for_line_decode read_line(std::ifstream &in, std::ofstream &out, string line_code, translation_type method, int bytes_per_line, vector<info_for_line_decode> &features) {
-    info_for_line_decode i = {"", 0, line_code};  // Defaults.
-    char buffer[255] = "";
+    info_for_line_decode info = {"", 0, line_code};  // Defaults.
+    char b[100] = "";
+    stringstream ss;
     int size_of_string;
-    
     switch (method) {
         case TEXT0 : // Reads the string length, then the string
+        case TEXT8:
             size_of_string = read_int(in);
-            if (size_of_string > 100) { out.close(); abort(); }
-            in.read((char *)& buffer, size_of_string);
-            i.value = buffer;
-            return i;
-        case TEXT8 : // Reads the string length, then the string, then 8 bytes of padding.
-            size_of_string = read_int(in);
-            if (size_of_string > 100) { out.close(); abort(); }
-            in.read((char *)& buffer, size_of_string);
-            i.value = buffer;
-            in.read(buffer, 8);       //  Padding
-            return i;
-        case INT :
-            i.v = read_int(in);
-            i.value = to_string(i.v);
-            return i;
-        case ZERO :
-            try {
-                i.value = read_zeros(in, bytes_per_line);
-                return i;
-            } catch(logic_error) {
-                out.close();
-                abort();
+            if (size_of_string > sizeof(b)-2) throw logic_error("expected tring too long");
+            in.read((char *)& b, size_of_string);
+            info.value = b;
+            if (method == TEXT8) {
+                if (read_int(in) != 0) {} //throw logic_error("Unexpected non-zero after text8");
+                if (read_int(in) != 0) {} //throw logic_error("Unexpected non-zero after text8");
             }
+            return info;
         case BULK :
-            i.value = read_bulk_hex(in, bytes_per_line);
-            return i;
+            for (int i=0;i<bytes_per_line;i++) {
+                in.read((char*)&b, 1);
+                ss << std::noshowbase << std::hex << nouppercase << setw(2) << setfill('0') << (int)(unsigned char)b[0];
+            }
+            info.value = ss.str();
+            return info;
+        case ZERO :
+            for (int i=0;i<bytes_per_line;i++) {
+                in.read((char*)&b, 1);
+                if (b[0] != 0) throw logic_error("Non-zero found in expected zero-string");
+            }
+            info.value = "zero_string";
+            return info;
+        case INT :
         case HEX :
-            read_hex(in, i);   // Edits i
-            return i;
+        case uFLOAT:
+        case mFLOAT:
+        case SHORT:
+        case CHAR:
+        case LCHAR:
+        case BINARY:
+            if (bytes_per_line != size_for_method.at(method))
+                    throw logic_error("Incorrect size request for fixed size number");
+            in.read((char*)&b, bytes_per_line);
+            for (int i=bytes_per_line-1; i>=0; i--) {
+                if (i<bytes_per_line-1) {
+                    info.v = (info.v<<8) + (unsigned char)b[i];
+                } else {
+                    info.v = (int)(char)b[i];
+                }
+                if (method == HEX) {
+                    ss << std::noshowbase << std::hex << uppercase << setw(2) << setfill('0') << (int)(unsigned char)b[i];
+                    if (i != 0) { ss << ".";}
+                }
+            }
+            switch (method) {
+                case uFLOAT:
+                    ss << std::right << std::fixed << setprecision(6) << setw(10) << double(info.v)/1'000'000;
+                    break;
+                case mFLOAT:
+                    if (info.v == 0) {
+                        ss << "0";
+                    } else {
+                        ss << std::left << std::fixed << setprecision(3) << setw(6) << double(info.v)/1000;
+                    }
+                    break;
+                case BINARY:
+                    ss << std::bitset<8>(info.v);
+                    break;
+                case HEX: ;
+                    // ss was already loaded for hex
+                    break;
+                default:
+                    ss << to_string(info.v);
+            }
+            info.value = ss.str();
+            return info;
         case FMAP :
         case SMAP :
         case CMAP :
-            i.value = read_world_map(in,bytes_per_line,method, line_code, features);
-            return i;
-        case BINARY :
-            read_binary(in, i);
-            return i;
-        case SHORT :
-            // set i.v
-            read_short(in, i);
-            return i;;
-        case mFLOAT :
-            i.value = read_mFloat(in);
-            return i;
-        case uFLOAT :
-            i.value = read_uFloat(in);
-            return i;
-        case CHAR :
-            read_char(in, i);
-            return i;
-        case LCHAR : // Not sure yet how this differs from char.
-            read_char(in, i);
-            return i;
+            info.value = read_world_map(in,bytes_per_line,method, line_code, features);
+            return info;
         default: ;
     }
-    throw logic_error("Problem with line reading");
 }

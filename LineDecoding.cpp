@@ -688,7 +688,7 @@ string full_translate(info_for_line_decode i) {
 
 string full_comment(info_for_line_decode i) {
     string temp_line_code = i.line_code;
-    while(true) { // Comment based on Log_5_6, Log_x_6, or Log_x_x
+    while(true) { // Improved, now handles Log_x_x and we don't need to pass subsection_x.
         if (line_decode.count(temp_line_code)) {
             return line_decode.at(temp_line_code).comment;
         } else {

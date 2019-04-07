@@ -16,6 +16,7 @@
 #include "SectionSplitting.hpp"
 #include "LineDecoding.hpp"
 #include "LineReading.hpp"
+#include "ReadMethod.hpp"
 using namespace std;
 
 
@@ -26,16 +27,6 @@ struct section { // This could become a name + subsection_info.
     translation_type method = BULK;   // Decode method for this section.
 };
 
-// The translation types have one (or two) character abbreviations in the pst file.
-const map<translation_type,string> char_for_method = {
-    {TEXT0,"t"}, {TEXT8,"t"}, {INT, "V"}, {HEX, "h"}, {BINARY, "B"}, {SHORT, "s"}, {CHAR, "C"}, {FMAP, "M"}, {BULK, "H"},
-    {ZERO,"x"}, {uFLOAT,"G"}, {mFLOAT, "g"},{LCHAR, "c"}, {SMAP, "m"}, {CMAP, "MM"},
-};
-// And many of them have a typical size.
-const map<translation_type,char> size_for_method = {
-    {TEXT0,0}, {TEXT8,8}, {INT,4}, {HEX,4}, {BINARY,1}, {SHORT,2}, {CHAR,1}, {ZERO,0},
-    {uFLOAT,4}, {BULK, 4}, {LCHAR, 1}, {mFLOAT, 4},
-};
 
 struct subsection_info {
     translation_type method;
@@ -57,6 +48,20 @@ bool is_world_map(translation_type m) {
 //   2. Backward Compatible: The pst gives enough information to restore the pirates_savegame file,
 //                           even if the decoding arrays below have changed.
 //
+
+
+vector<ReadMethod> intro_lines = {
+    rmTEXT0  {"Intro_0"},
+    rmINT    {"Intro_1"},
+    rmINT    {"Intro_2"},
+    rmHEX    {"Intro_3"},
+    rmINT    {"Intro_4"},
+    rmINT    {"Intro_5"},
+};
+
+
+
+
 const vector<section> section_vector = {
     {"Intro",             6,       4,  INT },
     {"CityName",        128,       8,  TEXT8 },
