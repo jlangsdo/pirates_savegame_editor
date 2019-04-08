@@ -57,10 +57,9 @@ string read_world_map(ifstream &in, int bytecount, translation_type m, string li
             if ((m==CMAP && b[i] != 9) ||
                 (m!=CMAP &&  b[i] != (unsigned char)(-1)) ) {
                 // Anomoly. Add to the features vector for printing after the main map.
-                sprintf(buf, "%02x", b[i]);
-                string value = string(buf);
-                
-                features.push_back( new PstLine{line_code + "_" + to_string(i), b[i],  value});
+                stringstream ss;
+                ss << std::noshowbase << std::hex << nouppercase << setw(2) << setfill('0') << (int)(unsigned char)b[i];
+                features.push_back( new PstLine{line_code + "_" + to_string(i), b[i],  ss.str()});
             }
         }
     }
