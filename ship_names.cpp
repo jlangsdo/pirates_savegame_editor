@@ -7,7 +7,7 @@
 //
 
 #include "ship_names.hpp"
-#include "Pirates.hpp"
+#include "RMeth.hpp"
 #include <string>
 #include <sstream>
 #include <iostream>

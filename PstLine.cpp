@@ -1,16 +1,22 @@
 //
-//  LineDecoding.cpp
+//  PstLine.cpp
 //  pirates_savegame_editor
 //
 //  Created by Langsdorf on 4/2/19.
 //  Copyright © 2019 Langsdorf. All rights reserved.
 //
 
-#include "LineDecoding.hpp"
-#include "LineReading.hpp"   // For the read_int routine, needed for starting_year.
+// This file handles one line of the pst file - decoding the comment and translation,
+// and getting the spacing right to match the perl version of unpacking.
+//
+// Note that PstLine is used to pass in data (because a decode function may use .v, .value, or .line_code)
+// but the result of the many different translate_* functions is not put into the PstLine, it is returned as a string.
+// This is so complicated translations can be built up from different smaller translations.
+
+#include "PstLine.hpp"   // For the read_int routine, needed for starting_year.
 #include "ship_names.hpp"   // ship_names is a subset of linedecoding.
 #include <stdio.h>
-#include <map>
+#include <unordered_map>
 #include <vector>
 #include <string>
 #include <regex>
@@ -22,14 +28,8 @@
 #include <iomanip>
 #include <iostream>
 #include <fstream>
-#include "Pirates.hpp"
+#include "RMeth.hpp"
 using namespace std;
-
-// This file handles printing a line of the pst file - decoding the comment and translation,
-// and getting the spacing right to match the perl version of unpacking.
-// Note that PstLine is used to pass in data (because a decode function may use .v, .value, or .line_code)
-// but the result is not put into the PstLine, it is returned as a string.
-// This is so complicated translations can be built up from different smaller translations.
 
 const int number_of_true_cities = 44; // Cities after this number are settlements, indian villages, Jesuit missions, or pirate bases.
 int starting_year;
@@ -64,7 +64,7 @@ int suffix_from_linecode (string line_code) { // Given Log_1_4, returns 4
 // These lists are most of the strings for 'translation' - explaining what the numerical value
 // on a particular line stands for. strings go here if they are indexed by a small number in the savegame file.
 // Some additional text is coded into the translation functions below.
-map <translatable, vector<string>> translation_lists = {
+unordered_map <translatable, vector<string>> translation_lists = {
     { RANK,
         { "No Rank", "Letter_of_Marque", "Captain", "Major", "Colonel",
             "Admiral", "Baron", "Count", "Marquis", "Duke"}},
@@ -124,7 +124,7 @@ map <translatable, vector<string>> translation_lists = {
 };
 
 // Translations that require special effort or which are called to store data.
-map <translatable, string (*)(const PstLine & i)> translation_functions = {
+unordered_map <translatable, string (*)(const PstLine & i)> translation_functions = {
     { SHIPNAME, translate_shipname },
     { SHIP_TYPE, save_last_shiptype },  // Is this really that much better than a switch/case statement?
     { STORE_CITYNAME, store_cityname }, // Turns out it is. Having lots of little functions
@@ -419,7 +419,13 @@ string translate_beauty_and_shipwright(const PstLine & i) {
 // These are the list of comments and translations - explaining what a line refers to.
 // Comments depend on the line_code, not the value there; translations depend on both.
 // This map does not have to be in the order that the lines appear in the savegame file, but it makes things easier to maintain if it is.
-map<string,decode_for_line> line_decode = {
+
+struct decode_for_line {
+    std::string comment = "";
+    translatable t ;
+};
+
+unordered_map<string,decode_for_line> line_decode = {
     {"Intro_1",        {"You are here x"}},
     {"Intro_2",        {"You are here y"}},
     {"Intro_4",        {"Difficulty", DIFFICULTY}},
@@ -700,7 +706,7 @@ void print_field (std::ofstream &out, string value, int default_width) {
     out << std::left << setw(width) << value << " : " ;
 }
 
-void PstLine::print(std::ofstream &out) {
+void PstLine::write_text(std::ofstream &out) {
     
     string typecode = mcode();
     string translation = get_translation();
@@ -709,24 +715,27 @@ void PstLine::print(std::ofstream &out) {
     // Perl script reports 4-byte integers as unsigned.
     // This is misleading, they act more like signed, so I am holding them
     // as signed internally, but printing unsigned to match.
-    if (typecode=="V4" && v < 0) {
+    if (method==INT && v < 0) {
         value = to_string((unsigned int)v);
     }
     
-    if (typecode=="F1") {
+    if (method==FEATURE) {
         // Spacing is different but simpler for F1 Feature case.
         out << line_code << "  : " << typecode << " : " << value << " :";
         if (comment=="" && translation=="") { out << " "; }
         out << comment << translation << "\n";
     } else {
-        // Regular spacing method
+        // Regular spacing method uses the print_field function to line up spaces.
         print_field(out, line_code, 8);
-        print_field(out, typecode, 3);
+        print_field(out, typecode,  3);
         
         int value_width = 1;
-        auto tc_size = stoi(regex_replace(typecode, regex("^\\D+"), ""));
-        if (tc_size <= 4 && regex_match(typecode.substr(0,1),regex("[VsCHc]"))) { value_width = 9; }
-        if (typecode.substr(0,1) == "t") { value_width = 20;}
+        if (method == TEXT0 || method == TEXT8) { value_width = 20; }
+        else if (bytes<=4) {
+            if (method==INT || method==BULK || method==SHORT || method==CHAR || method==LCHAR) {
+                value_width = 9;
+            }
+        }
         print_field(out, value, value_width);
         
         out << comment << translation << "\n";
@@ -735,4 +744,140 @@ void PstLine::print(std::ofstream &out) {
 
 string PstLine::mcode() {
     return char_for_method.at(method) + to_string(bytes);
+}
+// This file includes the functions for reading one line of text according to a translation_method,
+// and returning the result as a string value (and optionally an integer value for a translated comment).
+
+// Utilities?
+int read_int(ifstream & in) { // Read 4 bytes from in (little endian) and convert to integer
+    char b[4];
+    in.read((char*)&b, sizeof(b));
+    int B = (int)((unsigned char)(b[0]) |
+                  (unsigned char)(b[1]) << 8 |
+                  (unsigned char)(b[2]) << 16 |
+                  (char)(b[3]) << 24    );
+    return B;
+}
+
+
+void PstLine::read_binary_world_map(ifstream &in, boost::ptr_deque<PstLine> & features) {
+    unsigned char b[600];
+    in.read((char*)&b, bytes);
+    
+    vector<bitset<4> > bs(bytes/4+1, 0);
+    
+    const unsigned char sea = 0;
+    const unsigned char land    = method==CMAP ? 9 : (unsigned char)(-1);
+    const unsigned char max_sea = method==CMAP ? 4 : 0;
+    
+    for (int i=0; i<bytes; i++) {
+        auto j = i/4;
+        auto k = i % 4;
+        
+        if (b[i]>max_sea) { bs.at(j)[3-k] = 1; }
+        
+        if (b[i] != sea && b[i] != land) {
+            // Anomoly. Add to the features vector for printing after the main map.
+            stringstream ss;
+            ss << std::noshowbase << std::hex << nouppercase << setw(2) << setfill('0') << (int)(unsigned char)b[i];
+            features.push_back( new PstLine{line_code + "_" + to_string(i), FEATURE, b[i],  ss.str()});
+        }
+    }
+    // Now compressing the single bits of the map into hex for printing. SMAP would be all zeros, so it saves nothing.
+    if (method != SMAP) {
+        stringstream ss;
+        for (int j=0; j<bytes/4+1; j++) {
+            ss << std::noshowbase << std::hex << bs[j].to_ulong();
+        }
+        value = ss.str();
+    }
+}
+
+void PstLine::read_binary(std::ifstream &in, boost::ptr_deque<PstLine> & features) {
+    if (is_world_map(method)) {
+        this->read_binary_world_map(in, features);
+        line_code += "_293";
+    } else {
+        this->read_binary(in);
+    }
+}
+
+void PstLine::read_binary(std::ifstream &in) {
+    char b[100] = "";
+    stringstream ss;
+    int size_of_string;
+    switch (method) {
+        case TEXT0 : // Reads the string length, then the string
+        case TEXT8:
+            size_of_string = read_int(in);
+            if (size_of_string > sizeof(b)-2) throw logic_error("expected tring too long");
+            in.read((char *)& b, size_of_string);
+            value = b;
+            if (method == TEXT8) {
+                if (read_int(in) != 0) {} //throw logic_error("Unexpected non-zero after text8");
+                if (read_int(in) != 0) {} //throw logic_error("Unexpected non-zero after text8");
+            }
+            break;
+        case BULK :
+            for (int i=0;i<bytes;i++) {
+                in.read((char*)&b, 1);
+                ss << std::noshowbase << std::hex << nouppercase << setw(2) << setfill('0') << (int)(unsigned char)b[0];
+            }
+            value = ss.str();
+            break;
+        case ZERO :
+            for (int i=0;i<bytes;i++) {
+                in.read((char*)&b, 1);
+                if (b[0] != 0) throw logic_error("Non-zero found in expected zero-string");
+            }
+            value = "zero_string";
+            break;
+        case INT :
+        case HEX :
+        case uFLOAT:
+        case mFLOAT:
+        case SHORT:
+        case CHAR:
+        case LCHAR:
+        case BINARY:
+            if (bytes != standard_rmeth_size.at(method))
+                throw logic_error("Incorrect size request for fixed size number");
+            in.read((char*)&b, bytes);
+            for (int i=bytes-1; i>=0; i--) {
+                if (i<bytes-1) {
+                    v = (v<<8) + (unsigned char)b[i];
+                } else {
+                    v = (int)(char)b[i];
+                }
+                if (method == HEX) {
+                    ss << std::noshowbase << std::hex << uppercase << setw(2) << setfill('0') << (int)(unsigned char)b[i];
+                    if (i != 0) { ss << ".";}
+                }
+            }
+            switch (method) {
+                case uFLOAT:
+                    ss << std::right << std::fixed << setprecision(6) << setw(10) << double(v)/1'000'000;
+                    break;
+                case mFLOAT:
+                    if (v == 0) {
+                        ss << "0";
+                    } else {
+                        ss << std::left << std::fixed << setprecision(3) << setw(6) << double(v)/1000;
+                    }
+                    break;
+                case BINARY:
+                    ss << std::bitset<8>(v);
+                    break;
+                case HEX: ;
+                    // ss was already loaded for hex
+                    // However, we might want the first byte as a number 0..16 for lookup
+                    v = ((unsigned char)b[3]+8)/16;
+                    break;
+                default:
+                    ss << to_string(v);
+            }
+            value = ss.str();
+            break;
+        default: ;
+    }
 }

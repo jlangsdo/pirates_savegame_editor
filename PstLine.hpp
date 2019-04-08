@@ -10,10 +10,33 @@
 #define LineDecoding_hpp
 
 #include <stdio.h>
-#include <map>
 #include <vector>
 #include <string>
-#include "Pirates.hpp"
+#include "RMeth.hpp"
+#include "PstSection.hpp"
+
+class PstLine {
+public:
+    std::string line_code;
+    int v;                // value reduced to a small integer for lookups
+    std::string value;
+    rmeth method;
+    int bytes = standard_rmeth_size.at(method);
+    
+    PstLine(std::string lc, rmeth rm, int v, std::string value) : line_code(lc), method(rm), v(v), value(value) {}
+    PstLine(PstSection subsection) : line_code(subsection.name), method(subsection.splits.front().method), bytes(subsection.splits.front().bytes) {}
+    
+    void read_binary (std::ifstream &in, boost::ptr_deque<PstLine> & features);
+    void read_binary_world_map (std::ifstream &in, boost::ptr_deque<PstLine> & features);
+    void read_binary (std::ifstream &in);
+    void write_text (std::ofstream &out);
+    std::string mcode();
+    std::string get_comment();
+    std::string get_translation();
+};
+
+
+int read_int(std::ifstream & in);
 
 // Public routines
 void check_for_specials(std::ifstream &in, std::ofstream &out, std::string line_code);
@@ -23,6 +46,7 @@ void augment_decoder_groups();
 std::string full_translate(const PstLine &) ;
 std::string full_comment(const PstLine &) ;
 
+enum translatable : char;
 std::string translate(translatable t, const PstLine &);
 std::string simple_translate (translatable t, int as_int);
 std::string simple_translate (translatable t, std::string value);

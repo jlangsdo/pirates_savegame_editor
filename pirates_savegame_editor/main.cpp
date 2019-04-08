@@ -10,10 +10,10 @@
 #include <sstream>
 #include <getopt.h>
 #include <regex>
-#include "Pirates.hpp"
+#include "RMeth.hpp"
+#include "PstSection.hpp"
+#include "PstLine.hpp"
 #include "ship_names.hpp"
-#include "SectionSplitting.hpp"
-#include "LineDecoding.hpp"
 
 // This file handles processing the input switches and opening filehandles.
 // Other than the help messages, it knows nothing about the structure of the savegame file.

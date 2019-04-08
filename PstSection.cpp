@@ -8,16 +8,15 @@
 // This file maintains the algorithms and data for splitting up a section into
 // individual lines that can be read and translated, to unpack the savegame file.
 
-#include <map>
+#include <unordered_map>
 #include <vector>
 #include <list>
 #include <string>
 #include <regex>
 #include <iostream>
-#include "SectionSplitting.hpp"
-#include "LineDecoding.hpp"
-#include "LineReading.hpp"
-#include "Pirates.hpp"
+#include "PstSection.hpp"
+#include "PstLine.hpp"
+#include "RMeth.hpp"
 #include <boost/ptr_container/ptr_deque.hpp>
 using namespace std;
 
@@ -68,7 +67,7 @@ const vector<PstSection> section_vector = {
 // This map lets you split up a section into multiple lines of identically sized smaller types,
 // assuming that they will use the default byte counts for that type.
 // The size of the new translation_type should divide evenly into the original line size (this is checked at runtime)
-map<string,rmeth> subsection_simple_decode = {
+unordered_map<string,rmeth> subsection_simple_decode = {
     {"Personal_2",    BINARY},
     {"Personal_5",    SHORT},
     {"Personal_6",    SHORT},
@@ -107,7 +106,7 @@ map<string,rmeth> subsection_simple_decode = {
 // This map lets you recharacterize a section - change the rmeth or the length in bytes.
 // The recharacterized section will always then decode as a single line - you cannot recharacterize and then split.
 // Changing the length is dangerous - it breaks DDR - so it is here only for backward compatibility for t_0.
-map<string,PstSplit> subsection_recharacterize = {
+unordered_map<string,PstSplit> subsection_recharacterize = {
     {"Intro_0",       {TEXT0}},
     {"Intro_3",       {HEX}},
     {"City_x_4",      {BULK}},
@@ -125,7 +124,7 @@ map<string,PstSplit> subsection_recharacterize = {
 // for an INT and a ZERO. This manuever is required by DDR, to avoid renumbering later pieces
 // (Ship_x_4_7 numbering remained unchanged)
 //
-map<string,list<PstSplit>> subsection_manual_decode = {
+unordered_map<string,list<PstSplit>> subsection_manual_decode = {
     {"Personal_51",   {{CHAR}, {ZERO,3}}},           // 4 = 1+3
     {"Personal_52",   {{BINARY}, {BULK,3}}},         // 4 = 1+3
     {"Ship_x",        {{BULK,16, 10}, {ZERO,956}}}, // 1116 = 16*10+956
@@ -223,8 +222,8 @@ void PstSection::unpack (ifstream & in, ofstream & out) {
             
             if (subsection_is_actually_single_line) {
                 auto aline = PstLine(subsection);
-                aline.read(in, features);
-                aline.print(out);
+                aline.read_binary(in, features);
+                aline.write_text(out);
             }
         }
         offset += split.count;
@@ -232,7 +231,7 @@ void PstSection::unpack (ifstream & in, ofstream & out) {
         // world_map sections accumulate features, which we print after the map.
         if (is_world_map(split.method)) {
             for (auto feature : features) {
-                feature.print(out);
+                feature.write_text(out);
             }
             features.release();   // I think this deletes all of the PstLine objects created in read_world_map.
         }

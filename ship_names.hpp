@@ -10,7 +10,8 @@
 #define ship_names_hpp
 
 #include <string>
-#include "Pirates.hpp"
+#include "RMeth.hpp"
+#include "PstLine.hpp"
 
 void load_pirate_shipnames();
 void save_last_flag(std::string);
