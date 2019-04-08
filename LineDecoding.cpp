@@ -652,7 +652,7 @@ string translate_date(const PstLine & i) { // Translate the datestamp into a dat
 }
 
 string PstLine::get_translation() {
-    string temp_line_code = this->line_code;
+    string temp_line_code = line_code;
     while(true) { // Translate based on Log_5_6, Log_x_6, or Log_x_x
         if (line_decode.count(temp_line_code) && line_decode.at(temp_line_code).t != NIL) {
             return translate(line_decode.at(temp_line_code).t, *this);
@@ -665,7 +665,7 @@ string PstLine::get_translation() {
 }
 
 string PstLine::get_comment() {
-    string temp_line_code = this->line_code;
+    string temp_line_code = line_code;
     while(true) { // Improved, now handles Log_x_x and we don't need to pass subsection_x.
         if (line_decode.count(temp_line_code)) {
             return line_decode.at(temp_line_code).comment;
@@ -702,32 +702,32 @@ void print_field (std::ofstream &out, string value, int default_width) {
 
 void PstLine::print(std::ofstream &out) {
     
-    string typecode = this->mcode();
-    string translation = this->get_translation();
-    string comment = this->get_comment();
+    string typecode = mcode();
+    string translation = get_translation();
+    string comment = get_comment();
     
     // Perl script reports 4-byte integers as unsigned.
     // This is misleading, they act more like signed, so I am holding them
     // as signed internally, but printing unsigned to match.
-    if (typecode=="V4" && this->v < 0) {
-        this->value = to_string((unsigned int)this->v);
+    if (typecode=="V4" && v < 0) {
+        value = to_string((unsigned int)v);
     }
     
     if (typecode=="F1") {
         // Spacing is different but simpler for F1 Feature case.
-        out << this->line_code << "  : " << typecode << " : " << this->value << " :";
+        out << line_code << "  : " << typecode << " : " << value << " :";
         if (comment=="" && translation=="") { out << " "; }
         out << comment << translation << "\n";
     } else {
         // Regular spacing method
-        print_field(out, this->line_code, 8);
+        print_field(out, line_code, 8);
         print_field(out, typecode, 3);
         
         int value_width = 1;
         auto tc_size = stoi(regex_replace(typecode, regex("^\\D+"), ""));
         if (tc_size <= 4 && regex_match(typecode.substr(0,1),regex("[VsCHc]"))) { value_width = 9; }
         if (typecode.substr(0,1) == "t") { value_width = 20;}
-        print_field(out, this->value, value_width);
+        print_field(out, value, value_width);
         
         out << comment << translation << "\n";
     }

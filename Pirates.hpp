@@ -33,6 +33,11 @@ const std::map<rmeth,char> standard_rmeth_size = {
     {BULK, 4},  {ZERO,0}, {FEATURE,1},
 };
 
+bool constexpr is_world_map(rmeth m) {
+    // world maps get special handling.
+    return (m==SMAP || m==CMAP || m==FMAP);
+}
+
 struct decode_for_line {
     std::string comment = "";
     translatable t ;
@@ -48,14 +53,18 @@ public:
     
     PstLine(std::string lc, rmeth rm, int v, std::string value) : line_code(lc), method(rm), v(v), value(value) {}
     PstLine(std::string lc) : line_code(lc) {}
+    PstLine(std::string lc, rmeth rm) : line_code(lc), method(rm) {}
     PstLine(std::string lc, rmeth rm, int b) : line_code(lc), method(rm), bytes(b) {}
     
-    
+    void read (std::ifstream &in, boost::ptr_deque<PstLine> & features);
+    void read (std::ifstream &in);
     std::string mcode();
     void print (std::ofstream &out);
     std::string get_comment();
     std::string get_translation();
 };
+
+
 
 struct PstSplit {
     rmeth method;
@@ -73,6 +82,7 @@ public:
     PstSplit split;
     PstSection(std::string n, int c, int b, rmeth meth) : name(n), split(meth, b, c) {};
     PstSection(std::string n, int c, int b)             : name(n), split(BULK, b, c) {};
+    PstSection(std::string n, PstSplit s)               : name(n), split(s) {};
 };
 
 

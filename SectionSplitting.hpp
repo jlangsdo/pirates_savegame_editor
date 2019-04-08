@@ -18,7 +18,6 @@ struct PstSection;
 
 void unpack(std::ifstream & in, std::ofstream & out);
 void unpack_section (std::ifstream & in, std::ofstream & out, PstSection section, int offset=0, bool stopnow=false);
-bool is_world_map(rmeth m);
 int index_from_linecode (std::string line_code);
 
 #endif /* SectionSplitting_hpp */

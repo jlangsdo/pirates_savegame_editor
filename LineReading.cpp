@@ -65,8 +65,16 @@ string read_world_map(ifstream &in, int bytecount, rmeth m, string line_code, bo
     
 }
 
-PstLine read_line(std::ifstream &in, std::string line_code, rmeth method, int bytes, boost::ptr_deque<PstLine> & features) {
-    PstLine info {line_code, method, bytes};  // Defaults.
+void PstLine::read(std::ifstream &in, boost::ptr_deque<PstLine> & features) {
+    if (is_world_map(method)) {
+        value = read_world_map(in,bytes,method, line_code, features);
+        line_code += "_293";
+    } else {
+        this->read(in);
+    }
+}
+
+void PstLine::read(std::ifstream &in) {
     char b[100] = "";
     stringstream ss;
     int size_of_string;
@@ -76,26 +84,26 @@ PstLine read_line(std::ifstream &in, std::string line_code, rmeth method, int by
             size_of_string = read_int(in);
             if (size_of_string > sizeof(b)-2) throw logic_error("expected tring too long");
             in.read((char *)& b, size_of_string);
-            info.value = b;
+            value = b;
             if (method == TEXT8) {
                 if (read_int(in) != 0) {} //throw logic_error("Unexpected non-zero after text8");
                 if (read_int(in) != 0) {} //throw logic_error("Unexpected non-zero after text8");
             }
-            return info;
+            break;
         case BULK :
             for (int i=0;i<bytes;i++) {
                 in.read((char*)&b, 1);
                 ss << std::noshowbase << std::hex << nouppercase << setw(2) << setfill('0') << (int)(unsigned char)b[0];
             }
-            info.value = ss.str();
-            return info;
+            value = ss.str();
+            break;
         case ZERO :
             for (int i=0;i<bytes;i++) {
                 in.read((char*)&b, 1);
                 if (b[0] != 0) throw logic_error("Non-zero found in expected zero-string");
             }
-            info.value = "zero_string";
-            return info;
+            value = "zero_string";
+            break;
         case INT :
         case HEX :
         case uFLOAT:
@@ -109,9 +117,9 @@ PstLine read_line(std::ifstream &in, std::string line_code, rmeth method, int by
             in.read((char*)&b, bytes);
             for (int i=bytes-1; i>=0; i--) {
                 if (i<bytes-1) {
-                    info.v = (info.v<<8) + (unsigned char)b[i];
+                    v = (v<<8) + (unsigned char)b[i];
                 } else {
-                    info.v = (int)(char)b[i];
+                    v = (int)(char)b[i];
                 }
                 if (method == HEX) {
                     ss << std::noshowbase << std::hex << uppercase << setw(2) << setfill('0') << (int)(unsigned char)b[i];
@@ -120,34 +128,28 @@ PstLine read_line(std::ifstream &in, std::string line_code, rmeth method, int by
             }
             switch (method) {
                 case uFLOAT:
-                    ss << std::right << std::fixed << setprecision(6) << setw(10) << double(info.v)/1'000'000;
+                    ss << std::right << std::fixed << setprecision(6) << setw(10) << double(v)/1'000'000;
                     break;
                 case mFLOAT:
-                    if (info.v == 0) {
+                    if (v == 0) {
                         ss << "0";
                     } else {
-                        ss << std::left << std::fixed << setprecision(3) << setw(6) << double(info.v)/1000;
+                        ss << std::left << std::fixed << setprecision(3) << setw(6) << double(v)/1000;
                     }
                     break;
                 case BINARY:
-                    ss << std::bitset<8>(info.v);
+                    ss << std::bitset<8>(v);
                     break;
                 case HEX: ;
                     // ss was already loaded for hex
                     // However, we might want the first byte as a number 0..16 for lookup
-                    info.v = ((unsigned char)b[3]+8)/16;
+                    v = ((unsigned char)b[3]+8)/16;
                     break;
                 default:
-                    ss << to_string(info.v);
+                    ss << to_string(v);
             }
-            info.value = ss.str();
-            return info;
-        case FMAP :
-        case SMAP :
-        case CMAP :
-            info.value = read_world_map(in,bytes,method, line_code, features);
-            return info;
+            value = ss.str();
+            break;
         default: ;
     }
-    return info;
 }
