@@ -17,7 +17,6 @@ struct PstSplit;
 struct PstSection;
 
 void unpack(std::ifstream & in, std::ofstream & out);
-void unpack_section (std::ifstream & in, std::ofstream & out, PstSection section);
 int index_from_linecode (std::string line_code);
 
 #endif /* SectionSplitting_hpp */

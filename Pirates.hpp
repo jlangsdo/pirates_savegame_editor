@@ -56,7 +56,7 @@ struct PstSplit {
 };
 
 
-class PstSection { // This could become a name + subsection_info.
+class PstSection { 
 public:
     std::string name;
     std::list<PstSplit> splits;
@@ -65,6 +65,8 @@ public:
     PstSection(std::string n, int c, int b)             : name(n), splits{PstSplit(BULK, b, c)} {};
     PstSection(std::string n, PstSplit split)           : name(n), splits{split} {};
     PstSection(std::string n, std::list<PstSplit> splits)    : name(n), splits(splits) {};
+
+    void unpack(std::ifstream & in, std::ofstream & out);
 };
 
 class PstLine {
@@ -79,9 +81,10 @@ public:
     PstLine(PstSection subsection) : line_code(subsection.name), method(subsection.splits.front().method), bytes(subsection.splits.front().bytes) {}
     
     void read (std::ifstream &in, boost::ptr_deque<PstLine> & features);
+    void read_world_map (std::ifstream &in, boost::ptr_deque<PstLine> & features);
     void read (std::ifstream &in);
-    std::string mcode();
     void print (std::ofstream &out);
+    std::string mcode();
     std::string get_comment();
     std::string get_translation();
 };

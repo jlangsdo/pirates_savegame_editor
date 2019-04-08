@@ -151,7 +151,7 @@ void unpack(ifstream & in, ofstream & out) {
         for (auto section : section_vector) {
             out << "## " << section.name << " starts at byte " << in.tellg() << "\n";
             check_for_specials(in, out, section.name);
-            unpack_section(in, out, section);
+            section.unpack(in, out);
         }
     } catch (logic_error) {   // For debug, helps a lot to close out before aborting.
         out.close();
@@ -159,17 +159,17 @@ void unpack(ifstream & in, ofstream & out) {
     }
 }
 
-void unpack_section (ifstream & in, ofstream & out, PstSection mysection) {
+void PstSection::unpack (ifstream & in, ofstream & out) {
     
     // Unpack a section by printing each of the subsections that it is broken into, then any features that were collected.
     // Features are only collected from the direct child of a parent section whose rmeth is_world_map.
     int offset = 0;
-    for (auto split : mysection.splits) {
+    for (auto split : splits) {
         boost::ptr_deque<PstLine> features;
         
         for (int c=offset; c<split.count+offset;c++) {
             
-            PstSection subsection{mysection.name + "_" + to_string(c), split};
+            PstSection subsection{name + "_" + to_string(c), split};
             bool subsection_is_actually_single_line = true;  // We'll find out.
             
             // This while loop progressively changes the indices in the subsection to _x, to look it up in the maps.
@@ -213,7 +213,7 @@ void unpack_section (ifstream & in, ofstream & out, PstSection mysection) {
                     
                     // Our subsection will now be treated as a Section.
                     auto subsection_as_section = PstSection{subsection.name, new_splits};
-                    unpack_section(in, out, subsection_as_section);
+                    subsection_as_section.unpack(in, out);
                     break;
                 }
                 

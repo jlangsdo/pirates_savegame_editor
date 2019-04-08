@@ -32,17 +32,17 @@ int read_int(ifstream & in) { // Read 4 bytes from in (little endian) and conver
 }
 
 
-string read_world_map(ifstream &in, int bytecount, rmeth m, string line_code, boost::ptr_deque<PstLine> & features) {
+void PstLine::read_world_map(ifstream &in, boost::ptr_deque<PstLine> & features) {
     unsigned char b[600];
-    in.read((char*)&b, bytecount);
+    in.read((char*)&b, bytes);
     
-    vector<bitset<4> > bs(bytecount/4+1, 0);
+    vector<bitset<4> > bs(bytes/4+1, 0);
     
     const unsigned char sea = 0;
-    const unsigned char land    = m==CMAP ? 9 : (unsigned char)(-1);
-    const unsigned char max_sea = m==CMAP ? 4 : 0;
+    const unsigned char land    = method==CMAP ? 9 : (unsigned char)(-1);
+    const unsigned char max_sea = method==CMAP ? 4 : 0;
     
-    for (int i=0; i<bytecount; i++) {
+    for (int i=0; i<bytes; i++) {
         auto j = i/4;
         auto k = i % 4;
         
@@ -55,19 +55,19 @@ string read_world_map(ifstream &in, int bytecount, rmeth m, string line_code, bo
             features.push_back( new PstLine{line_code + "_" + to_string(i), FEATURE, b[i],  ss.str()});
         }
     }
-    // Now compressing the single bits of the map into hex for printing.
-    stringstream ss;
-    for (int j=0; j<bytecount/4+1; j++) {
-        ss << std::noshowbase << std::hex << bs[j].to_ulong();
+    // Now compressing the single bits of the map into hex for printing. SMAP would be all zeros, so it saves nothing.
+    if (method != SMAP) {
+        stringstream ss;
+        for (int j=0; j<bytes/4+1; j++) {
+            ss << std::noshowbase << std::hex << bs[j].to_ulong();
+        }
+        value = ss.str();
     }
-    if (m==SMAP) { return ""; }
-    return ss.str();
-    
 }
 
 void PstLine::read(std::ifstream &in, boost::ptr_deque<PstLine> & features) {
     if (is_world_map(method)) {
-        value = read_world_map(in,bytes,method, line_code, features);
+        this->read_world_map(in, features);
         line_code += "_293";
     } else {
         this->read(in);
