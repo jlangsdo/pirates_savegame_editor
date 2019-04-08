@@ -11,6 +11,7 @@
 		15472B2C2253EDBD00858D2F /* PstLine.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 15472B2A2253EDBD00858D2F /* PstLine.cpp */; };
 		156371F522581CC000EB4167 /* PstSection.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 156371F322581CC000EB4167 /* PstSection.cpp */; };
 		15874C5722526BD60046F95F /* ship_names.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 15874C5522526BD60046F95F /* ship_names.cpp */; };
+		1599E751225BE4E400EEB2C6 /* PstFile.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1599E74F225BE4E400EEB2C6 /* PstFile.cpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -35,6 +36,8 @@
 		15874C5522526BD60046F95F /* ship_names.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ship_names.cpp; sourceTree = "<group>"; };
 		15874C5622526BD60046F95F /* ship_names.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = ship_names.hpp; sourceTree = "<group>"; };
 		158A9BE9224F95210062534D /* RMeth.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = RMeth.hpp; sourceTree = "<group>"; };
+		1599E74F225BE4E400EEB2C6 /* PstFile.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = PstFile.cpp; sourceTree = "<group>"; };
+		1599E750225BE4E400EEB2C6 /* PstFile.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = PstFile.hpp; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -55,6 +58,8 @@
 				158A9BE9224F95210062534D /* RMeth.hpp */,
 				153F2B97224EC78E00CCA927 /* Products */,
 				15472B2A2253EDBD00858D2F /* PstLine.cpp */,
+				1599E74F225BE4E400EEB2C6 /* PstFile.cpp */,
+				1599E750225BE4E400EEB2C6 /* PstFile.hpp */,
 				15472B2B2253EDBD00858D2F /* PstLine.hpp */,
 				156371F322581CC000EB4167 /* PstSection.cpp */,
 				156371F422581CC000EB4167 /* PstSection.hpp */,
@@ -137,6 +142,7 @@
 			files = (
 				156371F522581CC000EB4167 /* PstSection.cpp in Sources */,
 				153F2B9A224EC78E00CCA927 /* main.cpp in Sources */,
+				1599E751225BE4E400EEB2C6 /* PstFile.cpp in Sources */,
 				15472B2C2253EDBD00858D2F /* PstLine.cpp in Sources */,
 				15874C5722526BD60046F95F /* ship_names.cpp in Sources */,
 			);
