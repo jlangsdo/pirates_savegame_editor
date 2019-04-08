@@ -52,7 +52,7 @@ string read_world_map(ifstream &in, int bytecount, rmeth m, string line_code, bo
             // Anomoly. Add to the features vector for printing after the main map.
             stringstream ss;
             ss << std::noshowbase << std::hex << nouppercase << setw(2) << setfill('0') << (int)(unsigned char)b[i];
-            features.push_back( new PstLine{line_code + "_" + to_string(i), b[i],  ss.str()});
+            features.push_back( new PstLine{line_code + "_" + to_string(i), FEATURE, b[i],  ss.str()});
         }
     }
     // Now compressing the single bits of the map into hex for printing.
@@ -65,8 +65,8 @@ string read_world_map(ifstream &in, int bytecount, rmeth m, string line_code, bo
     
 }
 
-PstLine read_line(std::ifstream &in, std::ofstream &out, string line_code, rmeth method, int bytes_per_line, boost::ptr_deque<PstLine> & features) {
-    PstLine info {line_code};  // Defaults.
+PstLine read_line(std::ifstream &in, std::string line_code, rmeth method, int bytes, boost::ptr_deque<PstLine> & features) {
+    PstLine info {line_code, method, bytes};  // Defaults.
     char b[100] = "";
     stringstream ss;
     int size_of_string;
@@ -83,14 +83,14 @@ PstLine read_line(std::ifstream &in, std::ofstream &out, string line_code, rmeth
             }
             return info;
         case BULK :
-            for (int i=0;i<bytes_per_line;i++) {
+            for (int i=0;i<bytes;i++) {
                 in.read((char*)&b, 1);
                 ss << std::noshowbase << std::hex << nouppercase << setw(2) << setfill('0') << (int)(unsigned char)b[0];
             }
             info.value = ss.str();
             return info;
         case ZERO :
-            for (int i=0;i<bytes_per_line;i++) {
+            for (int i=0;i<bytes;i++) {
                 in.read((char*)&b, 1);
                 if (b[0] != 0) throw logic_error("Non-zero found in expected zero-string");
             }
@@ -104,11 +104,11 @@ PstLine read_line(std::ifstream &in, std::ofstream &out, string line_code, rmeth
         case CHAR:
         case LCHAR:
         case BINARY:
-            if (bytes_per_line != size_for_method.at(method))
+            if (bytes != standard_rmeth_size.at(method))
                     throw logic_error("Incorrect size request for fixed size number");
-            in.read((char*)&b, bytes_per_line);
-            for (int i=bytes_per_line-1; i>=0; i--) {
-                if (i<bytes_per_line-1) {
+            in.read((char*)&b, bytes);
+            for (int i=bytes-1; i>=0; i--) {
+                if (i<bytes-1) {
                     info.v = (info.v<<8) + (unsigned char)b[i];
                 } else {
                     info.v = (int)(char)b[i];
@@ -145,8 +145,9 @@ PstLine read_line(std::ifstream &in, std::ofstream &out, string line_code, rmeth
         case FMAP :
         case SMAP :
         case CMAP :
-            info.value = read_world_map(in,bytes_per_line,method, line_code, features);
+            info.value = read_world_map(in,bytes,method, line_code, features);
             return info;
         default: ;
     }
+    return info;
 }

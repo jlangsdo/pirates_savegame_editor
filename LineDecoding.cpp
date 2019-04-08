@@ -651,11 +651,11 @@ string translate_date(const PstLine & i) { // Translate the datestamp into a dat
     return retval;
 }
 
-string full_translate(const PstLine & i) {
-    string temp_line_code = i.line_code;
+string PstLine::get_translation() {
+    string temp_line_code = this->line_code;
     while(true) { // Translate based on Log_5_6, Log_x_6, or Log_x_x
         if (line_decode.count(temp_line_code) && line_decode.at(temp_line_code).t != NIL) {
-            return translate(line_decode.at(temp_line_code).t, i);
+            return translate(line_decode.at(temp_line_code).t, *this);
         } else {
             if (! regex_search(temp_line_code, regex("_\\d"))) { break; }
             temp_line_code = regex_replace(temp_line_code, regex("_\\d+"), "_x", std::regex_constants::format_first_only);
@@ -664,9 +664,8 @@ string full_translate(const PstLine & i) {
     return "";
 }
 
-
-string full_comment(const PstLine & i) {
-    string temp_line_code = i.line_code;
+string PstLine::get_comment() {
+    string temp_line_code = this->line_code;
     while(true) { // Improved, now handles Log_x_x and we don't need to pass subsection_x.
         if (line_decode.count(temp_line_code)) {
             return line_decode.at(temp_line_code).comment;
@@ -688,7 +687,7 @@ void check_for_specials(std::ifstream &in, std::ofstream &out, string line_code)
         starting_year = read_int(in);
         in.seekg(-jump_dist-4, ios_base::cur);
     }
-    // The perl code had an extra comment here.
+    // The perl code had an extra comment just before this section.
     if (line_code == "Log") {
         out << "# Ship's Log\n";
     }
@@ -701,36 +700,39 @@ void print_field (std::ofstream &out, string value, int default_width) {
     out << std::left << setw(width) << value << " : " ;
 }
 
-void print_pst_line (std::ofstream &out, string typecode, PstLine & i) {
-    string translation = full_translate(i);
-    string comment = full_comment(i);
+void PstLine::print(std::ofstream &out) {
     
+    string typecode = this->mcode();
+    string translation = this->get_translation();
+    string comment = this->get_comment();
     
     // Perl script reports 4-byte integers as unsigned.
     // This is misleading, they act more like signed, so I am holding them
     // as signed internally, but printing unsigned to match.
-    if (typecode=="V4" && i.v < 0) {
-        i.value = to_string((unsigned int)i.v);
+    if (typecode=="V4" && this->v < 0) {
+        this->value = to_string((unsigned int)this->v);
     }
     
     if (typecode=="F1") {
         // Spacing is different but simpler for F1 Feature case.
-        out << i.line_code << "  : " << typecode << " : " << i.value << " :";
+        out << this->line_code << "  : " << typecode << " : " << this->value << " :";
         if (comment=="" && translation=="") { out << " "; }
         out << comment << translation << "\n";
     } else {
         // Regular spacing method
-        print_field(out, i.line_code, 8);
+        print_field(out, this->line_code, 8);
         print_field(out, typecode, 3);
         
         int value_width = 1;
         auto tc_size = stoi(regex_replace(typecode, regex("^\\D+"), ""));
         if (tc_size <= 4 && regex_match(typecode.substr(0,1),regex("[VsCHc]"))) { value_width = 9; }
         if (typecode.substr(0,1) == "t") { value_width = 20;}
-        print_field(out, i.value, value_width);
+        print_field(out, this->value, value_width);
         
         out << comment << translation << "\n";
     }
-    
-    
+}
+
+string PstLine::mcode() {
+    return char_for_method.at(method) + to_string(bytes);
 }

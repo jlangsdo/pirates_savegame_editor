@@ -16,7 +16,6 @@
 #include "Pirates.hpp"
 
 // Public routines
-void print_pst_line (std::ofstream &out, std::string, PstLine &);
 void check_for_specials(std::ifstream &in, std::ofstream &out, std::string line_code);
 void augment_decoder_groups();
 

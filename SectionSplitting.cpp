@@ -175,10 +175,10 @@ void unpack_section (ifstream & in, ofstream & out, PstSection mysection, int of
                 // Take the the section.byte_count and divide
                 // it equally to set up the subsections.
                 int count = 1;
-                if (size_for_method.at(submeth)>0) {
-                    count = mysection.split.bytes/size_for_method.at(submeth);
+                if (standard_rmeth_size.at(submeth)>0) {
+                    count = mysection.split.bytes/standard_rmeth_size.at(submeth);
                     
-                    if (mysection.split.bytes % size_for_method.at(submeth) != 0) {
+                    if (mysection.split.bytes % standard_rmeth_size.at(submeth) != 0) {
                         cerr << "Error decoding line " << subsection << " byte counts are not divisible\n";
                         out.close();
                         abort();
@@ -195,7 +195,7 @@ void unpack_section (ifstream & in, ofstream & out, PstSection mysection, int of
                     stopnext = true;
                 }
                 
-                struct::PstSection sub = {subsection,count, size_for_method.at(submeth) , submeth };
+                struct::PstSection sub = {subsection,count, standard_rmeth_size.at(submeth) , submeth };
                 unpack_section(in, out, sub, suboffset, stopnext);
                 continue;
                 // }
@@ -240,17 +240,17 @@ void unpack_section (ifstream & in, ofstream & out, PstSection mysection, int of
         }
         // When we get here, it means that there was just one line of data to read,
         // process, and print.
-        PstLine i = read_line(in, out, subsection, mysection.split.method, mysection.split.bytes, features);
-        if (is_world_map(mysection.split.method)) { i.line_code += "_293"; }
+        auto aline = read_line(in, subsection, mysection.split.method, mysection.split.bytes, features);
+        if (is_world_map(mysection.split.method)) { aline.line_code += "_293"; }
         
-        print_pst_line (out, char_for_method.at(mysection.split.method) + to_string(mysection.split.bytes), i);
+        aline.print(out);
         
     }
     
     // world_map sections accumulate features, which we print after the map.
     if (is_world_map(mysection.split.method)) {
-        for (auto f : features) {
-            print_pst_line(out, "F1", f);
+        for (auto aline : features) {
+            aline.print(out);
         }
         features.release();   // I think this deletes all of the PstLine objects created in read_world_map.
     }
