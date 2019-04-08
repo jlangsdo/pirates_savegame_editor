@@ -16,7 +16,8 @@
 #include "SectionSplitting.hpp"
 #include "LineDecoding.hpp"
 #include "LineReading.hpp"
-#include "ReadMethod.hpp"
+#include "Pirates.hpp"
+#include <boost/ptr_container/ptr_deque.hpp>
 using namespace std;
 
 
@@ -48,19 +49,6 @@ bool is_world_map(translation_type m) {
 //   2. Backward Compatible: The pst gives enough information to restore the pirates_savegame file,
 //                           even if the decoding arrays below have changed.
 //
-
-
-vector<ReadMethod> intro_lines = {
-    rmTEXT0  {"Intro_0"},
-    rmINT    {"Intro_1"},
-    rmINT    {"Intro_2"},
-    rmHEX    {"Intro_3"},
-    rmINT    {"Intro_4"},
-    rmINT    {"Intro_5"},
-};
-
-
-
 
 const vector<section> section_vector = {
     {"Intro",             6,       4,  INT },
@@ -179,7 +167,7 @@ void unpack(ifstream & in, ofstream & out) {
 
 void unpack_section (ifstream & in, ofstream & out, section mysection, int offset, bool stopnow) {
     
-    vector<info_for_line_decode> features;
+    boost::ptr_deque<PstLine> features;
     
     // section: Ship_0_0
     for (int c=offset; c<mysection.count+offset;c++) {
@@ -266,7 +254,7 @@ void unpack_section (ifstream & in, ofstream & out, section mysection, int offse
         }
         // When we get here, it means that there was just one line of data to read,
         // process, and print.
-        info_for_line_decode i = read_line(in, out, subsection, mysection.method, mysection.bytes_per_line, features);
+        PstLine i = read_line(in, out, subsection, mysection.method, mysection.bytes_per_line, features);
         if (is_world_map(mysection.method)) { i.line_code += "_293"; }
         
         print_pst_line (out, char_for_method.at(mysection.method) + to_string(mysection.bytes_per_line), i);
@@ -278,6 +266,7 @@ void unpack_section (ifstream & in, ofstream & out, section mysection, int offse
         for (auto f : features) {
             print_pst_line(out, "F1", f);
         }
+        features.release();   // I think this deletes all of the PstLine objects created in read_world_map.
     }
 }
 

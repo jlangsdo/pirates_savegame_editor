@@ -133,7 +133,7 @@ map <translatable, vector<string>> translation_lists = {
 };
 
 // Translations that require special effort or which are called to store data.
-map <translatable, string (*)(info_for_line_decode i)> translation_functions = {
+map <translatable, string (*)(const PstLine & i)> translation_functions = {
     { SHIPNAME, translate_shipname },
     { SHIP_TYPE, save_last_shiptype }, // Is this really that much better than a switch/case statement?
     { DIRECTION, translate_dir },
@@ -160,34 +160,34 @@ map <translatable, string (*)(info_for_line_decode i)> translation_functions = {
 
 
 
-string translate_soldiers(info_for_line_decode i) {
+string translate_soldiers(const PstLine & i) {
     if (i.v > 0) { return to_string(i.v*20);}
     else { return "None";}
 }
-string translate_acres(info_for_line_decode i) {
+string translate_acres(const PstLine & i) {
     return to_string(50*i.v) + " acres";
     
 }
-string translate_luxuries_and_spices(info_for_line_decode i) {
+string translate_luxuries_and_spices(const PstLine & i) {
     int as_int = i.v/2;
     if (as_int > 49 || as_int < 0) { as_int = 49;}   // TODO: This may be mimicing a bug in the perl
     if (as_int == 0) { return ""; }
     return to_string(as_int);
 }
-string translate_pirate_hangout(info_for_line_decode i) {
+string translate_pirate_hangout(const PstLine & i) {
     if (i.v == -1) { return "N/A"; }
     return simple_translate(CITYNAME, i.v);
 }
-string translate_population(info_for_line_decode i) {
+string translate_population(const PstLine & i) {
     return to_string( 200 * i.v);
 }
 
-string translate_following(info_for_line_decode i) {
+string translate_following(const PstLine & i) {
     if (i.v == -2) { return "following player";}
     else { return ""; }
 }
 
-string store_cityname (info_for_line_decode i) {
+string store_cityname (const PstLine & i) {
     // Save names of cities for later translations.
     int index = index_from_linecode(i.line_code);
     translation_lists[CITYNAME][index] = i.value;
@@ -215,7 +215,7 @@ string simple_translate (translatable t, int as_int) {
     return "";
 }
 
-string translate(translatable t, info_for_line_decode i) {
+string translate(translatable t, const PstLine & i) {
     if (t == NIL) { return ""; }
     
     string return_value = "";
@@ -242,7 +242,7 @@ string translate(translatable t, info_for_line_decode i) {
 
 
 
-string store_flag(info_for_line_decode i){
+string store_flag(const PstLine & i){
     string myflag = simple_translate(FLAG, i.v);
     myflag = regex_replace(myflag, regex("[\\(\\)]"),"");
     save_last_flag(myflag);
@@ -250,7 +250,7 @@ string store_flag(info_for_line_decode i){
 }
 
 vector<int> stored_city_wealth (128);
-string translate_wealth(info_for_line_decode i) {
+string translate_wealth(const PstLine & i) {
     int index = index_from_linecode(i.line_code);
     stored_city_wealth[index] = i.v;
     if (i.v != 300 ) {
@@ -258,7 +258,7 @@ string translate_wealth(info_for_line_decode i) {
     } else { return ""; }
 }
 
-string translate_population_type (info_for_line_decode i) {
+string translate_population_type (const PstLine & i) {
     // Cities are classified as having different sorts of population as a combination
     // of the Economy CityInfo_x_0_4 and the wealth City_x_5
     
@@ -277,7 +277,7 @@ string translate_population_type (info_for_line_decode i) {
     return simple_translate(POPULATION_CLASS, (int)pop_group + magic_number*is_wealthy);
 }
 
-string translate_dir (info_for_line_decode i) {  // Reads the hex string in value
+string translate_dir (const PstLine & i) {  // Reads the hex string in value
     char first_char = i.value.at(0);             // rather than the integer v.
     char second_char = i.value.at(1);
     
@@ -288,7 +288,7 @@ string translate_dir (info_for_line_decode i) {  // Reads the hex string in valu
     return simple_translate(DIR16, dir);
 }
 
-string translate_event_flags(info_for_line_decode i) {
+string translate_event_flags(const PstLine & i) {
     std::bitset<8> asbits(i.v);
     string retval = "";
     for (int j=0; j<5; j++) {  // Main nations reported only, plus Pirates.
@@ -303,7 +303,7 @@ string translate_event_flags(info_for_line_decode i) {
 int stored_event;
 int subevent;
 int temp_i;
-string translate_event(info_for_line_decode i) {
+string translate_event(const PstLine & i) {
     auto as_two = make_pair(i.v/16, i.v%16);
     int index = suffix_from_linecode(i.line_code);
     switch (index) {
@@ -389,12 +389,12 @@ string translate_event(info_for_line_decode i) {
     return "";
 }
 
-string translate_city_by_linecode (info_for_line_decode i) { // In this case, we aren't translating the value,
+string translate_city_by_linecode (const PstLine & i) { // In this case, we aren't translating the value,
     int index = index_from_linecode(i.line_code);           // but rather noting which cityname goes with this line_code.
     return simple_translate(CITYNAME, index);
 }
 
-string translate_peace_and_war (info_for_line_decode i) {
+string translate_peace_and_war (const PstLine & i) {
     auto nation1 = index_from_linecode(i.line_code) - 16;
     if (nation1 < 0 || nation1 > 5) { return "";}
     auto nation2 = suffix_from_linecode(i.line_code) + 1;
@@ -405,12 +405,12 @@ string translate_peace_and_war (info_for_line_decode i) {
     return "";
 }
 
-string translate_date_and_age(info_for_line_decode i) {
+string translate_date_and_age(const PstLine & i) {
     string date = translate_date(i);
     int age = stoi(regex_replace(date, regex(".* "), "")) - starting_year + 18;
     return "Approx Date: " + translate_date(i) + "; Age: " + to_string(age);
 }
-string translate_treasure_map(info_for_line_decode i) {
+string translate_treasure_map(const PstLine & i) {
     if (i.v==0 || i.v == -1) { return ""; }
     auto index = suffix_from_linecode(i.line_code);
     string retval = "feature";
@@ -419,7 +419,7 @@ string translate_treasure_map(info_for_line_decode i) {
     if (index & 16) { retval += " y coord "; } else { retval += " x coord "; }
     return retval;
 }
-string translate_ship_specialist (info_for_line_decode i) {
+string translate_ship_specialist (const PstLine & i) {
     // If a specialist is on board, then Ship_x_5_5 will be set to 10
     // and which specialist it is depends on the ship number.
     if (i.v != 10) { return ""; }
@@ -427,7 +427,7 @@ string translate_ship_specialist (info_for_line_decode i) {
     return simple_translate(SPECIALIST, index%8) + " on board";
 }
 
-string translate_beauty_and_shipwright(info_for_line_decode i) {
+string translate_beauty_and_shipwright(const PstLine & i) {
     int city_index = index_from_linecode(i.line_code);
     int city_value = (i.v+city_index)%8;
     string retval = "Shipwright can provide " + simple_translate(LONG_UPGRADES, city_value);
@@ -647,7 +647,7 @@ void augment_decoder_groups() {
     augment_cross_translation_list(PURPOSE, PURPOSE40, 40);
 }
 
-string translate_date(info_for_line_decode i) { // Translate the datestamp into a date in game time.
+string translate_date(const PstLine & i) { // Translate the datestamp into a date in game time.
     double stamp = i.v;
     if (stamp == 0 || stamp == -1) { return ""; }
     
@@ -672,7 +672,7 @@ string translate_date(info_for_line_decode i) { // Translate the datestamp into 
     return retval;
 }
 
-string full_translate(info_for_line_decode i) {
+string full_translate(const PstLine & i) {
     string temp_line_code = i.line_code;
     while(true) { // Translate based on Log_5_6, Log_x_6, or Log_x_x
         if (line_decode.count(temp_line_code) && line_decode.at(temp_line_code).t != NIL) {
@@ -686,7 +686,7 @@ string full_translate(info_for_line_decode i) {
 }
 
 
-string full_comment(info_for_line_decode i) {
+string full_comment(const PstLine & i) {
     string temp_line_code = i.line_code;
     while(true) { // Improved, now handles Log_x_x and we don't need to pass subsection_x.
         if (line_decode.count(temp_line_code)) {
@@ -722,7 +722,7 @@ void print_field (std::ofstream &out, string value, int default_width) {
     out << std::left << setw(width) << value << " : " ;
 }
 
-void print_pst_line (std::ofstream &out, string typecode, info_for_line_decode i) {
+void print_pst_line (std::ofstream &out, string typecode, PstLine & i) {
     string translation = full_translate(i);
     string comment = full_comment(i);
     

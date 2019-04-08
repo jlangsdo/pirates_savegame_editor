@@ -14,7 +14,7 @@
 
 void load_pirate_shipnames();
 void save_last_flag(std::string);
-std::string save_last_shiptype(info_for_line_decode);
-std::string translate_shipname(info_for_line_decode);
+std::string save_last_shiptype(const PstLine &);
+std::string translate_shipname(const PstLine &);
 
 #endif /* ship_names_hpp */

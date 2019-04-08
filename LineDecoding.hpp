@@ -16,15 +16,15 @@
 #include "Pirates.hpp"
 
 // Public routines
-void print_pst_line (std::ofstream &out, std::string, info_for_line_decode);
+void print_pst_line (std::ofstream &out, std::string, PstLine &);
 void check_for_specials(std::ifstream &in, std::ofstream &out, std::string line_code);
 void augment_decoder_groups();
 
 // Internal routines.
-std::string full_translate(info_for_line_decode) ;
-std::string full_comment(info_for_line_decode) ;
+std::string full_translate(const PstLine &) ;
+std::string full_comment(const PstLine &) ;
 
-std::string translate(translatable t, info_for_line_decode);
+std::string translate(translatable t, const PstLine &);
 std::string simple_translate (translatable t, int as_int);
 std::string simple_translate (translatable t, std::string value);
 
@@ -35,25 +35,25 @@ int suffix_from_linecode (std::string);
 
 // If this were a class, I would mark these private:
 // Stubs for routines called by translation_functions
-std::string translate_soldiers(info_for_line_decode) ;
-std::string translate_acres(info_for_line_decode) ;
-std::string translate_luxuries_and_spices(info_for_line_decode) ;
-std::string translate_population(info_for_line_decode) ;
-std::string translate_following(info_for_line_decode) ;
-std::string store_cityname (info_for_line_decode) ;
-std::string store_flag(info_for_line_decode);
-std::string translate_wealth(info_for_line_decode) ;
-std::string translate_population_type (info_for_line_decode) ;
-std::string translate_dir (info_for_line_decode) ;
-std::string translate_event_flags(info_for_line_decode) ;
-std::string translate_event(info_for_line_decode) ;
-std::string translate_city_by_linecode (info_for_line_decode) ;
-std::string translate_ship_specialist (info_for_line_decode) ;
-std::string translate_beauty_and_shipwright(info_for_line_decode) ;
-std::string translate_date(info_for_line_decode) ;
-std::string translate_date_and_age(info_for_line_decode) ;
-std::string translate_peace_and_war(info_for_line_decode) ;
-std::string translate_treasure_map(info_for_line_decode) ;
-std::string translate_pirate_hangout(info_for_line_decode);
+std::string translate_soldiers(const PstLine &) ;
+std::string translate_acres(const PstLine &) ;
+std::string translate_luxuries_and_spices(const PstLine &) ;
+std::string translate_population(const PstLine &) ;
+std::string translate_following(const PstLine &) ;
+std::string store_cityname (const PstLine &) ;
+std::string store_flag(const PstLine &);
+std::string translate_wealth(const PstLine &) ;
+std::string translate_population_type (const PstLine &) ;
+std::string translate_dir (const PstLine &) ;
+std::string translate_event_flags(const PstLine &) ;
+std::string translate_event(const PstLine &) ;
+std::string translate_city_by_linecode (const PstLine &) ;
+std::string translate_ship_specialist (const PstLine &) ;
+std::string translate_beauty_and_shipwright(const PstLine &) ;
+std::string translate_date(const PstLine &) ;
+std::string translate_date_and_age(const PstLine &) ;
+std::string translate_peace_and_war(const PstLine &) ;
+std::string translate_treasure_map(const PstLine &) ;
+std::string translate_pirate_hangout(const PstLine &);
 
 #endif /* LineDecoding_hpp */

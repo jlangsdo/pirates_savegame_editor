@@ -37,10 +37,13 @@ struct decode_for_line {
     translatable t ;
 };
 
-struct info_for_line_decode {
-    std::string value;
-    int v;                // value reduced to an integer
+class PstLine {
+public:
     std::string line_code;
+    int v;                // value reduced to a small integer for lookups
+    std::string value;
+    PstLine(std::string lc, int v, std::string value) : line_code(lc), v(v), value(value) {}
+    PstLine(std::string lc) : line_code(lc) {}
 };
 
 

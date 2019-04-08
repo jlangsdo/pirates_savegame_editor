@@ -33,7 +33,7 @@ string last_flag = "";
 void save_last_flag(string flag) { last_flag = flag;   }
 
 int last_shiptype = 0;
-string save_last_shiptype(info_for_line_decode i) {
+string save_last_shiptype(const PstLine & i) {
     last_shiptype = stoi(i.value);
     return "";
 }
@@ -696,7 +696,7 @@ void load_pirate_shipnames() {
     }
 }
 
-string translate_shipname(info_for_line_decode i) {
+string translate_shipname(const PstLine & i) {
     if (last_flag == "") { return "NIL"; }
     if (last_shiptype < 0 || last_shiptype > shipname_type_by_class.size()) { return "NIL"; }
 

@@ -7,6 +7,7 @@
 //
 
 #include "LineReading.hpp"
+#include <boost/ptr_container/ptr_deque.hpp>
 #include "Pirates.hpp"
 #include <string>
 #include <sstream>
@@ -30,7 +31,7 @@ int read_int(ifstream & in) { // Read 4 bytes from in (little endian) and conver
 }
 
 
-string read_world_map(ifstream &in, int bytecount, translation_type m, string line_code, vector<info_for_line_decode> & features) {
+string read_world_map(ifstream &in, int bytecount, translation_type m, string line_code, boost::ptr_deque<PstLine> & features) {
     unsigned char b[600];
     in.read((char*)&b, bytecount);
     
@@ -57,7 +58,9 @@ string read_world_map(ifstream &in, int bytecount, translation_type m, string li
                 (m!=CMAP &&  b[i] != (unsigned char)(-1)) ) {
                 // Anomoly. Add to the features vector for printing after the main map.
                 sprintf(buf, "%02x", b[i]);
-                features.push_back({buf, b[i], line_code + "_" + to_string(i)});
+                string value = string(buf);
+                
+                features.push_back( new PstLine{line_code + "_" + to_string(i), b[i],  value});
             }
         }
     }
@@ -71,8 +74,8 @@ string read_world_map(ifstream &in, int bytecount, translation_type m, string li
     
 }
 
-info_for_line_decode read_line(std::ifstream &in, std::ofstream &out, string line_code, translation_type method, int bytes_per_line, vector<info_for_line_decode> &features) {
-    info_for_line_decode info = {"", 0, line_code};  // Defaults.
+PstLine read_line(std::ifstream &in, std::ofstream &out, string line_code, translation_type method, int bytes_per_line, boost::ptr_deque<PstLine> & features) {
+    PstLine info {line_code};  // Defaults.
     char b[100] = "";
     stringstream ss;
     int size_of_string;
