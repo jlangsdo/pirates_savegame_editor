@@ -43,27 +43,6 @@ struct decode_for_line {
     translatable t ;
 };
 
-class PstLine {
-public:
-    std::string line_code;
-    int v;                // value reduced to a small integer for lookups
-    std::string value;
-    rmeth method;
-    int bytes = standard_rmeth_size.at(method);
-    
-    PstLine(std::string lc, rmeth rm, int v, std::string value) : line_code(lc), method(rm), v(v), value(value) {}
-    PstLine(std::string lc) : line_code(lc) {}
-    PstLine(std::string lc, rmeth rm) : line_code(lc), method(rm) {}
-    PstLine(std::string lc, rmeth rm, int b) : line_code(lc), method(rm), bytes(b) {}
-    
-    void read (std::ifstream &in, boost::ptr_deque<PstLine> & features);
-    void read (std::ifstream &in);
-    std::string mcode();
-    void print (std::ofstream &out);
-    std::string get_comment();
-    std::string get_translation();
-};
-
 
 
 struct PstSplit {
@@ -85,5 +64,23 @@ public:
     PstSection(std::string n, PstSplit s)               : name(n), split(s) {};
 };
 
+class PstLine {
+public:
+    std::string line_code;
+    int v;                // value reduced to a small integer for lookups
+    std::string value;
+    rmeth method;
+    int bytes = standard_rmeth_size.at(method);
+    
+    PstLine(std::string lc, rmeth rm, int v, std::string value) : line_code(lc), method(rm), v(v), value(value) {}
+    PstLine(PstSection subsection) : line_code(subsection.name), method(subsection.split.method), bytes(subsection.split.bytes) {}
+    
+    void read (std::ifstream &in, boost::ptr_deque<PstLine> & features);
+    void read (std::ifstream &in);
+    std::string mcode();
+    void print (std::ofstream &out);
+    std::string get_comment();
+    std::string get_translation();
+};
 
 #endif /* Pirates_hpp */

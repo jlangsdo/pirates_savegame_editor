@@ -146,104 +146,93 @@ map<string,vector<PstSplit>> subsection_manual_decode = {
 };
 
 void unpack(ifstream & in, ofstream & out) {
-    for (auto section : section_vector) {
-        out << "## " << section.name << " starts at byte " << in.tellg() << "\n";
-        check_for_specials(in, out, section.name);
-        unpack_section(in, out, section);
+    try {
+        for (auto section : section_vector) {
+            out << "## " << section.name << " starts at byte " << in.tellg() << "\n";
+            check_for_specials(in, out, section.name);
+            unpack_section(in, out, section);
+        }
+    } catch (logic_error) {   // For debug, helps a lot to close out before aborting.
+        out.close();
+        abort();
     }
 }
 
-void unpack_section (ifstream & in, ofstream & out, PstSection mysection, int offset, bool stopnow) {
+void unpack_section (ifstream & in, ofstream & out, PstSection mysection, int offset) {
     
+    // Unpack a section by printing each of the subsections that it is broken into, then any features that were collected.
+    // Features are only collected from the direct child of a parent section whose rmeth is_world_map.
     boost::ptr_deque<PstLine> features;
-    
-    // section: Ship_0_0
     for (int c=offset; c<mysection.split.count+offset;c++) {
-        string subsection = mysection.name + "_" + to_string(c);   // Subsection Ship_0_0_0
         
-        if(! stopnow) {
-            bool stopnext = false;
-            bool done_processing = false;
+        PstSection subsection{mysection.name + "_" + to_string(c), mysection.split};    // Subsection Ship_0_0_0, inherits rmeth and bytes from parent split.
+        bool subsection_is_actually_single_line = true;
+        
+        // This while loop progressively changes the indices in the subsection to _x, to look it up in the maps.
+        string temp_line_code = subsection.name;
+        while(true) {
             
-            string temp_line_code = subsection;
-            while(true) { // This while loop progressively changes the indices in the subsection to _x.
-                
-                if (subsection_recharacterize.count(temp_line_code)) {
-                    
-                    struct::PstSection sub = {mysection.name, subsection_recharacterize.at(temp_line_code)};
-                    unpack_section(in, out, sub, c, true);
-                    done_processing = true;
-                }
-                
-                if (subsection_simple_decode.count(temp_line_code) ||
-                    subsection_manual_decode.count(temp_line_code) ) {
-                    done_processing = true;
-                    
-                    
-                    vector<PstSplit> info;
-                    
-                    if (subsection_simple_decode.count(temp_line_code)) {
-                        // For subsection_simple_decode, we auto-calculate how many pieces to split it into.
-                        int autocount = 1;
-                        auto submeth = subsection_simple_decode.at(temp_line_code);
-                        if (standard_rmeth_size.at(submeth)>0) {
-                            autocount = mysection.split.bytes/standard_rmeth_size.at(submeth);
-                        }
-                        info.push_back(PstSplit{submeth, standard_rmeth_size.at(submeth), autocount});
-                    } else {
-                        // For manual_decode_count, this was already done manually.
-                        info = subsection_manual_decode.at(temp_line_code);
-                    }
-                
-                    // Count how many pieces the subsection is splitting into, and how big they are.
-                    int count = 0;
-                    int byte_count_check = 0;
-                    for (auto subinfo : info) {
-                        count += subinfo.count;
-                        byte_count_check += subinfo.count*subinfo.bytes;
-                    }
-                    
-                    int suboffset = 0;
-                    
-                    if (byte_count_check != mysection.split.bytes) {
-                        cerr << "Error decoding line " << subsection << " subsections don't add up: " << byte_count_check << " != " << mysection.split.bytes << "\n";
-                        out.close();
-                        abort();
-                    }
-                    
-                    for (auto subinfo : info) {
-                        rmeth submeth = subinfo.method;
-                        struct::PstSection sub = {subsection,subinfo.count, subinfo.bytes , submeth };
-                        
-                        // cerr << subsection << "," << subinfo.multiplier  << "," << subinfo.byte_count << "\n";
-                        unpack_section(in, out, sub, suboffset, stopnext);
-                        suboffset += subinfo.count;
-                    }
-                    break;
-                }
-                if (! regex_search(temp_line_code, regex("_\\d"))) { break; }
-                temp_line_code = regex_replace(temp_line_code, regex("_\\d+"), "_x", std::regex_constants::format_first_only);
+            // subsection_recharacterize replaces the PstSplit with an alternate split, just for this subsection..
+            if (subsection_recharacterize.count(temp_line_code)) {
+                subsection.split = subsection_recharacterize.at(temp_line_code);
             }
-            if (done_processing) { continue; }
+            
+            if (subsection_simple_decode.count(temp_line_code) ||
+                subsection_manual_decode.count(temp_line_code) ) {
+                
+                // Instead of printing this line, we split it, by calling unpack_section recursively.
+                subsection_is_actually_single_line = false;
+                
+                vector<PstSplit> splits;
+                if (subsection_simple_decode.count(temp_line_code)) {
+                    // For subsection_simple_decode, we have to calculate how many pieces to split it into.
+                    int autocount = 1;
+                    auto submeth = subsection_simple_decode.at(temp_line_code);
+                    if (standard_rmeth_size.at(submeth)>0) {
+                        autocount = mysection.split.bytes/standard_rmeth_size.at(submeth);
+                    }
+                    splits.push_back(PstSplit{submeth, standard_rmeth_size.at(submeth), autocount});
+                } else {
+                    // For manual_decode_count, this was  done manually.
+                    splits = subsection_manual_decode.at(temp_line_code);
+                }
+                
+                int byte_count_check = 0;
+                for (auto subinfo : splits) {
+                    byte_count_check += subinfo.count*subinfo.bytes;
+                }
+                if (byte_count_check != mysection.split.bytes) {
+                    cerr << "Error decoding line " << subsection.name << " subsections don't add up: " << byte_count_check << " != " << mysection.split.bytes << "\n";
+                    out.close();
+                    abort();
+                }
+                
+                // Our subsection will now be treated as a Section. If it has multiple types of splits inside,
+                // call each one successively keeping track of the offset.
+                int suboffset = 0;
+                for (PstSplit asplit : splits) {
+                    auto subsection_as_section = PstSection{subsection.name, asplit };
+                    unpack_section(in, out, subsection_as_section, suboffset);
+                    suboffset += asplit.count;
+                }
+                break;
+            }
+            
+            if (! regex_search(temp_line_code, regex("_\\d"))) { break; }
+            temp_line_code = regex_replace(temp_line_code, regex("_\\d+"), "_x", std::regex_constants::format_first_only);
         }
         
-        // When we get here, it means that there was just one line of data to read. The subsection was actually a line_code.
-        
-        auto aline = PstLine(subsection, mysection.split.method, mysection.split.bytes);
-        try {
+        if (subsection_is_actually_single_line) {
+            auto aline = PstLine(subsection);
             aline.read(in, features);
-        } catch (logic_error) {
-            out.close();
-            abort();
+            aline.print(out);
         }
-        aline.print(out);
-        
     } // for loop of subsections of section.
     
     // world_map sections accumulate features, which we print after the map.
     if (is_world_map(mysection.split.method)) {
-        for (auto aline : features) {
-            aline.print(out);
+        for (auto feature : features) {
+            feature.print(out);
         }
         features.release();   // I think this deletes all of the PstLine objects created in read_world_map.
     }
