@@ -15,6 +15,7 @@
 #include <string>
 #include <map>
 #include <boost/ptr_container/ptr_deque.hpp>
+#include <list>
 
 enum translatable : char;
 enum rmeth : char { TEXT0, TEXT8, HEX, INT, BINARY, SHORT, CHAR, LCHAR, mFLOAT, uFLOAT, FMAP, SMAP, CMAP, BULK, ZERO, FEATURE };
@@ -58,10 +59,12 @@ struct PstSplit {
 class PstSection { // This could become a name + subsection_info.
 public:
     std::string name;
-    PstSplit split;
-    PstSection(std::string n, int c, int b, rmeth meth) : name(n), split(meth, b, c) {};
-    PstSection(std::string n, int c, int b)             : name(n), split(BULK, b, c) {};
-    PstSection(std::string n, PstSplit s)               : name(n), split(s) {};
+    std::list<PstSplit> splits;
+    
+    PstSection(std::string n, int c, int b, rmeth meth) : name(n), splits{PstSplit(meth, b, c)} {};
+    PstSection(std::string n, int c, int b)             : name(n), splits{PstSplit(BULK, b, c)} {};
+    PstSection(std::string n, PstSplit split)           : name(n), splits{split} {};
+    PstSection(std::string n, std::list<PstSplit> splits)    : name(n), splits(splits) {};
 };
 
 class PstLine {
@@ -73,7 +76,7 @@ public:
     int bytes = standard_rmeth_size.at(method);
     
     PstLine(std::string lc, rmeth rm, int v, std::string value) : line_code(lc), method(rm), v(v), value(value) {}
-    PstLine(PstSection subsection) : line_code(subsection.name), method(subsection.split.method), bytes(subsection.split.bytes) {}
+    PstLine(PstSection subsection) : line_code(subsection.name), method(subsection.splits.front().method), bytes(subsection.splits.front().bytes) {}
     
     void read (std::ifstream &in, boost::ptr_deque<PstLine> & features);
     void read (std::ifstream &in);
