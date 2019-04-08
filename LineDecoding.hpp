@@ -29,7 +29,6 @@ std::string simple_translate (translatable t, int as_int);
 std::string simple_translate (translatable t, std::string value);
 
 // Utilities?
-int read_as_hex (char c);
 int index_from_linecode (std::string);
 int suffix_from_linecode (std::string);
 
@@ -44,7 +43,6 @@ std::string store_cityname (const PstLine &) ;
 std::string store_flag(const PstLine &);
 std::string translate_wealth(const PstLine &) ;
 std::string translate_population_type (const PstLine &) ;
-std::string translate_dir (const PstLine &) ;
 std::string translate_event_flags(const PstLine &) ;
 std::string translate_event(const PstLine &) ;
 std::string translate_city_by_linecode (const PstLine &) ;

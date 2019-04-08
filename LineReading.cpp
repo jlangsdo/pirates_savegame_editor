@@ -143,6 +143,8 @@ PstLine read_line(std::ifstream &in, std::ofstream &out, string line_code, trans
                     break;
                 case HEX: ;
                     // ss was already loaded for hex
+                    // However, we might want the first byte as a number 0..16 for lookup
+                    info.v = ((unsigned char)b[3]+8)/16;
                     break;
                 default:
                     ss << to_string(info.v);

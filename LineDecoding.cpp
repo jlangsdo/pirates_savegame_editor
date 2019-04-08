@@ -27,6 +27,9 @@ using namespace std;
 
 // This file handles printing a line of the pst file - decoding the comment and translation,
 // and getting the spacing right to match the perl version of unpacking.
+// Note that PstLine is used to pass in data (because a decode function may use .v, .value, or .line_code)
+// but the result is not put into the PstLine, it is returned as a string.
+// This is so complicated translations can be built up from different smaller translations.
 
 const int number_of_true_cities = 44; // Cities after this number are settlements, indian villages, Jesuit missions, or pirate bases.
 int starting_year;
@@ -35,31 +38,19 @@ enum translatable : char {
     // All translatable enums should be mapped in the translation_lists
     NIL, NONE, RANK, DIFFICULTY, NATION, FLAG, SKILL, SPECIAL_MOVE, SHIP_TYPE,
     DISPOSITION, BEAUTY, SHORT_UPGRADES, LONG_UPGRADES, CITYNAME, DIR16,
-    SHORT_DIRECTION, PIRATE,
+    DIR8, PIRATE,
     EVENT, EVENTS3, EVENTS15, EVENTS32, EVENTS64,
     PURPOSE, PURPOSE0, PURPOSE30, PURPOSE40,
     WEALTH_CLASS, POPULATION_CLASS, SOLDIERS, FLAG_TYPE, SPECIALIST,
     ITEM, BETTER_ITEM, PIRATE_HANGOUT,
     // or in the translation_functions
-    DIRECTION, SHIPNAME, STORE_CITYNAME, DATE, FOLLOWING, CITY_BY_LINECODE, WEALTH, POPULATION,
+    SHIPNAME, STORE_CITYNAME, DATE, FOLLOWING, CITY_BY_LINECODE, WEALTH, POPULATION,
     POPULATION_TYPE, ACRES, LUXURIES_AND_SPICES, BEAUTY_AND_SHIPWRIGHT, FURTHER_EVENT, SHIP_SPECIALIST,
     PEACE_AND_WAR, DATE_AND_AGE, TREASURE_MAP, LANDMARK,
     // If it is not mapped in either, that is not an error: it is hook for future code).
 };
 
-
-
 // Utilities?
-int read_as_hex (char c) { // Reads a char ascii value, returns digital equivalent when read as hex.
-    int res = (int)(c-'0');
-    if (res >= 0 && res <= 9) { return res;}
-    
-    res = (int)(c-'A'+10);
-    if (res >=10 && res <=15) { return res;}
-    
-    throw out_of_range("Bad digit conversion to hex for " + to_string(c));
-}
-
 int index_from_linecode (string line_code) { // Given Ship_23_1_4, returns 23
     string line = regex_replace(line_code, regex("^[^_]+_"), "");
     line = regex_replace(line,regex("[ _].*"), "");
@@ -101,7 +92,7 @@ map <translatable, vector<string>> translation_lists = {
         "copper plating", "cotton sails", "triple hammocks", "iron scantlings",
         "chain shot", "grape shot", "fine grain powder", "bronze cannon"}},
     { DIR16, {"N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW", "N"}},
-    { SHORT_DIRECTION, {"N", "NE", "E", "SE", "S", "SW", "W", "NW", "N"}},
+    { DIR8, {"N", "NE", "E", "SE", "S", "SW", "W", "NW", "N"}},
     // CITYNAME is loaded during the reading of the CityName section, for use in other sections
     { CITYNAME, vector<string> (128) },
     { WEALTH_CLASS, {"quiet and desolate", "baking in the sun", "bustling with activity","clean and prosperous", "brimming with wealth",}},
@@ -135,10 +126,9 @@ map <translatable, vector<string>> translation_lists = {
 // Translations that require special effort or which are called to store data.
 map <translatable, string (*)(const PstLine & i)> translation_functions = {
     { SHIPNAME, translate_shipname },
-    { SHIP_TYPE, save_last_shiptype }, // Is this really that much better than a switch/case statement?
-    { DIRECTION, translate_dir },
-    { STORE_CITYNAME, store_cityname },
-    { FLAG, store_flag },
+    { SHIP_TYPE, save_last_shiptype },  // Is this really that much better than a switch/case statement?
+    { STORE_CITYNAME, store_cityname }, // Turns out it is. Having lots of little functions
+    { FLAG, store_flag },               // makes it possible to compose them.
     { DATE, translate_date },
     { FOLLOWING, translate_following },
     { SHIP_SPECIALIST, translate_ship_specialist },
@@ -275,17 +265,6 @@ string translate_population_type (const PstLine & i) {
     int is_wealthy = (stored_city_wealth[index] > 100) ? 1:0;
     
     return simple_translate(POPULATION_CLASS, (int)pop_group + magic_number*is_wealthy);
-}
-
-string translate_dir (const PstLine & i) {  // Reads the hex string in value
-    char first_char = i.value.at(0);             // rather than the integer v.
-    char second_char = i.value.at(1);
-    
-    int dir = read_as_hex(first_char);
-    int next_digit = read_as_hex(second_char);
-    if (next_digit > 7) { dir++; }
-    
-    return simple_translate(DIR16, dir);
 }
 
 string translate_event_flags(const PstLine & i) {
@@ -478,7 +457,7 @@ map<string,decode_for_line> line_decode = {
     {"Ship_x_0_4", {"Target Ship"}},
     {"Ship_x_0_6", {"x Coordinate"}},
     {"Ship_x_1_0", {"y Coordinate"}},
-    {"Ship_x_1_1", {"direction",       DIRECTION  }},
+    {"Ship_x_1_1", {"direction",       DIR16  }},
     {"Ship_x_1_2", {"speed"}},
     {"Ship_x_2_0", {"% Damage Sails"}},
     {"Ship_x_2_1", {"% Damage Hull"}},
@@ -537,7 +516,7 @@ map<string,decode_for_line> line_decode = {
     {"CityInfo_x_1_14",  {"World Map price of Sugar"}},
     {"CityInfo_x_1_15",  {"World Map price of Cannon"}},
     {"CityInfo_x_1_16",  {"Recruitable Crew Baseline", CITY_BY_LINECODE}},
-    {"CityInfo_x_3_11",  {"ship launch direction 0-7", SHORT_DIRECTION}},
+    {"CityInfo_x_3_11",  {"ship launch direction 0-7", DIR8}},
     {"CityInfo_x_4",     {"", CITY_BY_LINECODE}},
     {"Log_x_0",          {"", EVENT}},
     {"Log_x_x",          {"", FURTHER_EVENT}},
@@ -579,8 +558,8 @@ map<string,decode_for_line> line_decode = {
     {"t_7_3",             {"Starting Year"}},
     {"CityLoc_x_0",       {"x coord", CITY_BY_LINECODE}},
     {"CityLoc_x_1",       {"y coord",}},
-    {"CityLoc_x_2",       {"pier direction", DIRECTION}},
-    {"CityLoc_x_3",       {"fort direction", DIRECTION}},
+    {"CityLoc_x_2",       {"pier direction", DIR16}},
+    {"CityLoc_x_3",       {"fort direction", DIR16}},
     {"CoastMap_x_x",      {"", LANDMARK}},
     {"SailingMap_x_x",    {"", LANDMARK}},
     {"FeatureMap_x_x",    {"", LANDMARK}},
@@ -593,7 +572,7 @@ map<string,decode_for_line> line_decode = {
     {"Top10_x_7",         {"Ships Captured"}},
     {"LandingParty_0_0",  {"x coordinate"}},
     {"LandingParty_1_0",  {"y coordinate"}},
-    {"LandingParty_3_0",  {"Direction", DIRECTION}},
+    {"LandingParty_3_0",  {"Direction", DIR16}},
     {"Skill_0",           { "", SKILL}},
     
 };
