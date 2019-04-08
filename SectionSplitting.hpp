@@ -11,14 +11,14 @@
 
 #include <fstream>
 #include <string>
-enum translation_type : char;
+enum rmeth : char;
 
-struct subsection_info;
-struct section;
+struct PstSplit;
+struct PstSection;
 
 void unpack(std::ifstream & in, std::ofstream & out);
-void unpack_section (std::ifstream & in, std::ofstream & out, section section, int offset=0, bool stopnow=false);
-bool is_world_map(translation_type m);
+void unpack_section (std::ifstream & in, std::ofstream & out, PstSection section, int offset=0, bool stopnow=false);
+bool is_world_map(rmeth m);
 int index_from_linecode (std::string line_code);
 
 #endif /* SectionSplitting_hpp */

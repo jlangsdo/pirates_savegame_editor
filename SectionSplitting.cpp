@@ -21,21 +21,7 @@
 using namespace std;
 
 
-struct section { // This could become a name + subsection_info.
-    std::string name;
-    int count;                        // i.e. how many lines to divide into
-    int bytes_per_line;               //
-    translation_type method = BULK;   // Decode method for this section.
-};
-
-
-struct subsection_info {
-    translation_type method;
-    int byte_count=size_for_method.at(method);
-    int multiplier=1;
-};
-
-bool is_world_map(translation_type m) {
+bool is_world_map(rmeth m) {
     // world maps get special handling.
     return (m==SMAP || m==CMAP || m==FMAP);
 }
@@ -50,7 +36,7 @@ bool is_world_map(translation_type m) {
 //                           even if the decoding arrays below have changed.
 //
 
-const vector<section> section_vector = {
+const vector<PstSection> section_vector = {
     {"Intro",             6,       4,  INT },
     {"CityName",        128,       8,  TEXT8 },
     {"Personal",         57,       4,  INT },
@@ -86,7 +72,7 @@ const vector<section> section_vector = {
 // This map lets you split up a section into multiple lines of identically sized smaller types,
 // assuming that they will use the default byte counts for that type.
 // The size of the new translation_type should divide evenly into the original line size (this is checked at runtime)
-map<string,translation_type> subsection_simple_decode = {
+map<string,rmeth> subsection_simple_decode = {
     {"Intro_0",       TEXT0},
     {"Intro_3",       HEX},
     {"Personal_2",    BINARY},
@@ -135,7 +121,7 @@ map<string,translation_type> subsection_simple_decode = {
 // for an INT and a ZERO. This manuever is required by DDR, to avoid renumbering later pieces
 // (Ship_x_4_7 numbering remained unchanged)
 //
-map<string,vector<subsection_info>> subsection_manual_decode = {
+map<string,vector<PstSplit>> subsection_manual_decode = {
     {"Personal_51",   {{CHAR}, {ZERO,3}}},           // 4 = 1+3
     {"Personal_52",   {{BINARY}, {BULK,3}}},         // 4 = 1+3
     {"Ship_x",        {{BULK,16, 10}, {ZERO,956}}}, // 1116 = 16*10+956
@@ -165,12 +151,12 @@ void unpack(ifstream & in, ofstream & out) {
     }
 }
 
-void unpack_section (ifstream & in, ofstream & out, section mysection, int offset, bool stopnow) {
+void unpack_section (ifstream & in, ofstream & out, PstSection mysection, int offset, bool stopnow) {
     
     boost::ptr_deque<PstLine> features;
     
     // section: Ship_0_0
-    for (int c=offset; c<mysection.count+offset;c++) {
+    for (int c=offset; c<mysection.split.count+offset;c++) {
         string subsection = mysection.name + "_" + to_string(c);
         // subsection (could be a line_code)           Ship_0_0_2
         string subsection_x = regex_replace(subsection, regex(R"(^([^_]+)_\d+)"), "$1_x");
@@ -182,7 +168,7 @@ void unpack_section (ifstream & in, ofstream & out, section mysection, int offse
         if(! stopnow) {
             bool stopnext = false;
             if (subsection_simple_decode.count(subsection) || subsection_simple_decode.count(subsection_x)) {
-                translation_type submeth = subsection_simple_decode.count(subsection) ?
+                rmeth submeth = subsection_simple_decode.count(subsection) ?
                 subsection_simple_decode.at(subsection) : subsection_simple_decode.at(subsection_x);
                 
                 //if (submeth != mysection.method) { // Avoids infinite loop.
@@ -190,9 +176,9 @@ void unpack_section (ifstream & in, ofstream & out, section mysection, int offse
                 // it equally to set up the subsections.
                 int count = 1;
                 if (size_for_method.at(submeth)>0) {
-                    count = mysection.bytes_per_line/size_for_method.at(submeth);
+                    count = mysection.split.bytes/size_for_method.at(submeth);
                     
-                    if (mysection.bytes_per_line % size_for_method.at(submeth) != 0) {
+                    if (mysection.split.bytes % size_for_method.at(submeth) != 0) {
                         cerr << "Error decoding line " << subsection << " byte counts are not divisible\n";
                         out.close();
                         abort();
@@ -209,7 +195,7 @@ void unpack_section (ifstream & in, ofstream & out, section mysection, int offse
                     stopnext = true;
                 }
                 
-                struct::section sub = {subsection,count, size_for_method.at(submeth) , submeth };
+                struct::PstSection sub = {subsection,count, size_for_method.at(submeth) , submeth };
                 unpack_section(in, out, sub, suboffset, stopnext);
                 continue;
                 // }
@@ -217,7 +203,7 @@ void unpack_section (ifstream & in, ofstream & out, section mysection, int offse
             
             if (subsection_manual_decode.count(subsection) || subsection_manual_decode.count(subsection_x)) {
                 
-                vector<subsection_info> info = subsection_manual_decode.count(subsection) ?
+                vector<PstSplit> info = subsection_manual_decode.count(subsection) ?
                 subsection_manual_decode.at(subsection) : subsection_manual_decode.at(subsection_x);
                 
                 int suboffset = 0;
@@ -225,26 +211,26 @@ void unpack_section (ifstream & in, ofstream & out, section mysection, int offse
                 int count = 0;
                 bool stopnext = false;
                 for (auto subinfo : info) {
-                    count += subinfo.multiplier;
-                    byte_count_check += subinfo.multiplier*subinfo.byte_count;
+                    count += subinfo.count;
+                    byte_count_check += subinfo.count*subinfo.bytes;
                 }
                 if (count == 1) {
                     subsection = mysection.name;
                     suboffset = c;
                     stopnext = true;
-                } else if (byte_count_check != mysection.bytes_per_line) {
-                    cerr << "Error decoding line " << subsection << " subsections don't add up: " << byte_count_check << " != " << mysection.bytes_per_line << "\n";
+                } else if (byte_count_check != mysection.split.bytes) {
+                    cerr << "Error decoding line " << subsection << " subsections don't add up: " << byte_count_check << " != " << mysection.split.bytes << "\n";
                     out.close();
                     abort();
                     // It will probably crash later anyway.
                 }
                 for (auto subinfo : info) {
-                    translation_type submeth = subinfo.method;
-                    struct::section sub = {subsection,subinfo.multiplier, subinfo.byte_count , submeth };
+                    rmeth submeth = subinfo.method;
+                    struct::PstSection sub = {subsection,subinfo.count, subinfo.bytes , submeth };
                     
                     // cerr << subsection << "," << subinfo.multiplier  << "," << subinfo.byte_count << "\n";
                     unpack_section(in, out, sub, suboffset, stopnext);
-                    suboffset += subinfo.multiplier;
+                    suboffset += subinfo.count;
                     
                 }
                 
@@ -254,15 +240,15 @@ void unpack_section (ifstream & in, ofstream & out, section mysection, int offse
         }
         // When we get here, it means that there was just one line of data to read,
         // process, and print.
-        PstLine i = read_line(in, out, subsection, mysection.method, mysection.bytes_per_line, features);
-        if (is_world_map(mysection.method)) { i.line_code += "_293"; }
+        PstLine i = read_line(in, out, subsection, mysection.split.method, mysection.split.bytes, features);
+        if (is_world_map(mysection.split.method)) { i.line_code += "_293"; }
         
-        print_pst_line (out, char_for_method.at(mysection.method) + to_string(mysection.bytes_per_line), i);
+        print_pst_line (out, char_for_method.at(mysection.split.method) + to_string(mysection.split.bytes), i);
         
     }
     
     // world_map sections accumulate features, which we print after the map.
-    if (is_world_map(mysection.method)) {
+    if (is_world_map(mysection.split.method)) {
         for (auto f : features) {
             print_pst_line(out, "F1", f);
         }

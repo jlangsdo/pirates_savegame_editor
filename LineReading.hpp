@@ -15,9 +15,9 @@
 #include <vector>
 #include "Pirates.hpp"
 #include <boost/ptr_container/ptr_deque.hpp>
-enum translation_type : char;
+enum rmeth : char;
 
-PstLine read_line(std::ifstream &in, std::ofstream &out, std::string line_code, translation_type method, int bytes_per_line, boost::ptr_deque<PstLine> & features);
+PstLine read_line(std::ifstream &in, std::ofstream &out, std::string line_code, rmeth method, int bytes_per_line, boost::ptr_deque<PstLine> & features);
 int read_int(std::ifstream & in);
 std::string str_tolower(std::string);
 
