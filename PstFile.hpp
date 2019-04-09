@@ -12,10 +12,19 @@
 #include <stdio.h>
 #include <boost/ptr_container/ptr_map.hpp>
 #include <string>
+#include <map>
 #include "PstLine.hpp"
 
+void pack(std::ifstream & in, std::ofstream & out);
+
 class PstFile {
-    boost::ptr_map<std::string, boost::ptr_map<double, PstLine> >  data;
+public:
+    void read_text(std::ifstream & i);
+    void write_pg(std::ofstream & i);
+private:
+    void remove_features();
+    void apply_features();
+    std::unordered_map<std::string, boost::ptr_map<double, PstLine> >  data;
 };
 
 

@@ -730,7 +730,7 @@ void PstLine::write_text(std::ofstream &out) {
         print_field(out, typecode,  3);
         
         int value_width = 1;
-        if (method == TEXT0 || method == TEXT8) { value_width = 20; }
+        if (method == TEXT) { value_width = 20; }
         else if (bytes<=4) {
             if (method==INT || method==BULK || method==SHORT || method==CHAR || method==LCHAR) {
                 value_width = 9;
@@ -743,7 +743,7 @@ void PstLine::write_text(std::ofstream &out) {
 }
 
 string PstLine::mcode() {
-    return char_for_method.at(method) + to_string(bytes);
+    return char_for_method.left.at(method) + to_string(bytes);
 }
 // This file includes the functions for reading one line of text according to a translation_method,
 // and returning the result as a string value (and optionally an integer value for a translated comment).
@@ -807,13 +807,12 @@ void PstLine::read_binary(std::ifstream &in) {
     stringstream ss;
     int size_of_string;
     switch (method) {
-        case TEXT0 : // Reads the string length, then the string
-        case TEXT8:
+        case TEXT : // Reads the string length, then the string
             size_of_string = read_int(in);
             if (size_of_string > sizeof(b)-2) throw logic_error("expected tring too long");
             in.read((char *)& b, size_of_string);
             value = b;
-            if (method == TEXT8) {
+            if (bytes == 8) {
                 if (read_int(in) != 0) {} //throw logic_error("Unexpected non-zero after text8");
                 if (read_int(in) != 0) {} //throw logic_error("Unexpected non-zero after text8");
             }

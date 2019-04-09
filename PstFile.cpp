@@ -9,3 +9,53 @@
 // with each line read corresponding to one PstLine.
 
 #include "PstFile.hpp"
+#include <string>
+#include <regex>
+#include <iostream>
+#include <iomanip>
+#include <sstream>
+using namespace std;
+
+void pack(std::ifstream & in, std::ofstream & out) {
+    PstFile contents{};
+    contents.read_text(in);
+    contents.write_pg(out);
+}
+
+void PstFile::read_text(std::ifstream & in) {
+    string line;
+    
+    //                               Section1 Number2     rmeth3  bytes4          value5    comments/translation
+    auto const line_regex = regex(R"(([^_ ]+)(_\S+)\s+:\s+([^\W\d]+)(\d+)\s+:\s+(.*)\s+:.*)");
+    auto const digit_regex = regex("_(\\d+)");
+    while(getline(in, line)) {
+        
+        std::smatch matches;    // same as std::match_results<string::const_iterator> sm;
+        if (std::regex_match(line, matches, line_regex, std::regex_constants::match_default)) {
+            
+            // Convert the line_code numbers into a decimal for quick sorting.
+            // Ship_17_4_2 => 0. 017 004 002 = 0.017004002
+            stringstream digits;
+            digits << "0." ;
+            smatch index;
+            string numbers = matches[2];
+            while (std::regex_search(numbers,index,digit_regex)) { // This is like a split operation.
+                digits << setw(3) << setfill ('0') << index[1].str();
+                numbers = index.suffix().str();
+            }
+            double sortcode = stod(digits.str());
+            
+            cout << "Section " << matches[1] << " " << sortcode << " = PstLine ";
+            cout << matches[3] << " " << matches[4] << " = " << matches[5] << "\n";
+            
+            
+        } else {
+            cout << line << "\n";  // Stripping out comments.
+        }
+    }
+    if (in.bad())
+        throw runtime_error("Error while reading pst file");
+}
+void PstFile::write_pg(std::ofstream & out) {
+    
+}

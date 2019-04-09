@@ -33,7 +33,7 @@ using namespace std;
 
 const vector<PstSection> section_vector = {
     {"Intro",             6,       4,  INT },
-    {"CityName",        128,       8,  TEXT8 },
+    {"CityName",        128,       8,  TEXT },
     {"Personal",         57,       4,  INT },
     {"Ship",            128,    1116, },
     {"f",               128,    1116, },
@@ -59,7 +59,7 @@ const vector<PstSection> section_vector = {
     {"k",                 8,       4, INT},
     {"LandingParty",      8,      32, },
     {"m",                 1,      12, },
-    {"ShipName",          8,       8,  TEXT8 },
+    {"ShipName",          8,       8,  TEXT },
     {"Skill",             1,       4, INT },
     
 };
@@ -107,7 +107,7 @@ unordered_map<string,rmeth> subsection_simple_decode = {
 // The recharacterized section will always then decode as a single line - you cannot recharacterize and then split.
 // Changing the length is dangerous - it breaks DDR - so it is here only for backward compatibility for t_0.
 unordered_map<string,PstSplit> subsection_recharacterize = {
-    {"Intro_0",       {TEXT0}},
+    {"Intro_0",       {TEXT,0}},
     {"Intro_3",       {HEX}},
     {"City_x_4",      {BULK}},
     {"City_x_7",      {BULK}},
@@ -152,8 +152,9 @@ void unpack(ifstream & in, ofstream & out) {
             check_for_specials(in, out, section.name);
             section.unpack(in, out);
         }
-    } catch (logic_error) {   // For debug, helps a lot to close out before aborting.
+    } catch (logic_error & e) {   // For debug, helps a lot to close out before aborting.
         out.close();
+        cerr << e.what();
         abort();
     }
 }

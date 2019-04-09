@@ -13,6 +13,7 @@
 #include "RMeth.hpp"
 #include "PstSection.hpp"
 #include "PstLine.hpp"
+#include "PstFile.hpp"
 #include "ship_names.hpp"
 
 // This file handles processing the input switches and opening filehandles.
@@ -22,6 +23,7 @@ using namespace std;
 
 string find_file(string dir, string file, string suffix);
 void unpack_pg_to_pst(string pg_file, string pst_file);
+void pack_pst_to_pg(string pst_file, string pg_file);
 
 const string usage = R"USAGE(
 
@@ -72,6 +74,7 @@ int main(int argc, char **argv)
     string save_dir = "/usr";
     
     // Get the pirates module ready to go.
+    set_up_rmeth();
     augment_decoder_groups();
     load_pirate_shipnames();
     
@@ -98,7 +101,13 @@ int main(int argc, char **argv)
         }
     }
     if (pack.size()) {
-        cout << "Packing " << pack << "\n";
+        string file_to_pack;
+        std::istringstream tokenStream(pack);
+        while(std::getline(tokenStream, file_to_pack, ',')) {
+            string pst_file = find_file(save_dir, file_to_pack, pst);
+            string pg_file = regex_replace(pst_file, regex("\\." + pst + "$"), "." + pg);
+            pack_pst_to_pg(pst_file, pg_file);
+        }
     }
 }
 
@@ -147,3 +156,25 @@ void unpack_pg_to_pst(string pg_file, string pst_file) {
     pg_in.close();
     pst_out.close();
 }
+
+void pack_pst_to_pg(string pst_file, string pg_file) {
+    ifstream pst_in = ifstream(pst_file);
+    if (! pst_in.is_open()) {
+        cerr << "Failed to read from " << pst_file << "\n";
+        exit(1);
+    }
+    cout << "Reading " << pst_file << "\n";
+    
+    ofstream pg_out = ofstream(pg_file);
+    if (! pg_out.is_open()) {
+        cerr << "Failed to write to " << pg_file << "\n";
+        pst_in.close();
+        exit(1);
+    }
+    cout << "Writing " << pg_file << "\n\n";
+    
+    pack(pst_in, pg_out);
+    pst_in.close();
+    pg_out.close();
+}
+
