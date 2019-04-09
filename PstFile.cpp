@@ -9,11 +9,13 @@
 // with each line read corresponding to one PstLine.
 
 #include "PstFile.hpp"
+#include "PstSection.hpp"
 #include <string>
 #include <regex>
 #include <iostream>
 #include <iomanip>
 #include <sstream>
+#include <vector>
 using namespace std;
 
 void pack(std::ifstream & in, std::ofstream & out) {
@@ -45,17 +47,26 @@ void PstFile::read_text(std::ifstream & in) {
             }
             double sortcode = stod(digits.str());
             
-            cout << "Section " << matches[1] << " " << sortcode << " = PstLine ";
-            cout << matches[3] << " " << matches[4] << " = " << matches[5] << "\n";
+        //    cout << "Section " << matches[1] << " " << sortcode << " = PstLine ";
+        //    cout << matches[3] << " " << matches[4] << " = " << matches[5] << "\n";
             
+            rmeth method = char_for_method.right.at(matches[3]);
+            string section = matches[1];
+            int bytes = stoi(matches[4]);
+            string value = matches[5];
+            data[section].emplace(sortcode, std::make_unique<PstLine>(method, bytes, value) );
             
         } else {
-            cout << line << "\n";  // Stripping out comments.
+         //   cout << line << "\n";  // Stripping out comments.
         }
     }
     if (in.bad())
         throw runtime_error("Error while reading pst file");
 }
 void PstFile::write_pg(std::ofstream & out) {
-    
+    for (auto section : section_vector) {
+        if (data[section.name].size() > 0 ) {
+            cout << "Writing " << section.name << "\n";
+        }
+    }
 }

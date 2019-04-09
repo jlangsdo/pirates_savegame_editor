@@ -25,7 +25,7 @@ public:
     
     PstLine(std::string lc, rmeth rm, int v, std::string value) : line_code(lc), method(rm), v(v), value(value) {}
     PstLine(PstSection subsection) : line_code(subsection.name), method(subsection.splits.front().method), bytes(subsection.splits.front().bytes) {}
-    PstLine(rmeth rm, int b, std::string value) : method(rm), bytes(b), value(value) {}
+    PstLine(rmeth rm, int bytes, std::string value) : method(rm), bytes(bytes), value(value) {}
     
     void read_binary (std::ifstream &in, boost::ptr_deque<PstLine> & features);
     void read_binary_world_map (std::ifstream &in, boost::ptr_deque<PstLine> & features);

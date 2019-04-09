@@ -38,5 +38,6 @@ public:
     
     void unpack(std::ifstream & in, std::ofstream & out);
 };
+extern const std::vector<PstSection> section_vector;
 
 #endif /* SectionSplitting_hpp */
