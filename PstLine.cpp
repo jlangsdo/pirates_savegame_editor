@@ -880,3 +880,60 @@ void PstLine::read_binary(std::ifstream &in) {
         default: ;
     }
 }
+
+void PstLine::write_binary(std::ofstream & out) {
+    unsigned int vcopy = 0;
+    int bcopy = bytes;
+    switch (method) {
+        case TEXT:
+            vcopy = (unsigned int)value.length();
+            bcopy = 4;
+            break;
+        case INT:
+            vcopy = (unsigned int)stoul(value);
+            break;
+        case SHORT:
+        case CHAR:
+        case LCHAR:
+            vcopy = (unsigned int)(stoi(value));
+            break;
+        case uFLOAT:
+             vcopy = (unsigned int)(stod(value) * 1000000);
+            break;
+        case mFLOAT:
+            vcopy = (unsigned int)(stod(value) * 1000);
+            break;
+        case BINARY:
+            vcopy = (unsigned int)stoul(value,nullptr,2);
+            break;
+        case HEX:
+            for (auto b=0; b<bytes; b++) {
+                vcopy = (vcopy << 8) + stoi(value.substr(3*b,2), nullptr, 16);
+            }
+            break;
+        case ZERO:
+        default:
+            vcopy = 0;
+    }
+    switch (method) {
+        case FEATURE:
+            break;
+        case BULK:
+            for (auto b=0; b<bytes; b++) {
+                out << (unsigned char)stoi(value.substr(2*b,2), nullptr, 16);
+            }
+            break;
+        default:
+            for (auto b=0;b<bcopy;b++) {
+                out << (unsigned char)(vcopy % 256);
+                vcopy = vcopy >> 8;
+            }
+            break;
+    }
+    if (method == TEXT) {
+        out << value;
+        for (auto b=0; b<bytes; b++) {
+            out << (char)0;
+        }
+    }
+}

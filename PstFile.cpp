@@ -28,7 +28,7 @@ void PstFile::read_text(std::ifstream & in) {
     string line;
     
     //                               Section1 Number2     rmeth3  bytes4          value5    comments/translation
-    auto const line_regex = regex(R"(([^_ ]+)(_\S+)\s+:\s+([^\W\d]+)(\d+)\s+:\s+(.*)\s+:.*)");
+    auto const line_regex = regex(R"(([^_ ]+)(_\S+)\s+:\s+([^\W\d]+)(\d+)\s+:\s+(.*?)\s+:.*)");
     auto const digit_regex = regex("_(\\d+)");
     while(getline(in, line)) {
         
@@ -67,6 +67,13 @@ void PstFile::write_pg(std::ofstream & out) {
     for (auto section : section_vector) {
         if (data[section.name].size() > 0 ) {
             cout << "Writing " << section.name << "\n";
+            
+            if (is_world_map(section.splits.front().method)) {
+                cout << "   Careful, that's a world_map section\n";
+            }
+            for (auto&& pair : data[section.name]) {
+                pair.second->write_binary(out);
+            }
         }
     }
 }

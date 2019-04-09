@@ -31,6 +31,8 @@ public:
     void read_binary_world_map (std::ifstream &in, boost::ptr_deque<PstLine> & features);
     void read_binary (std::ifstream &in);
     void write_text (std::ofstream &out);
+    void write_binary (std::ofstream &out);
+    
     std::string mcode();
     std::string get_comment();
     std::string get_translation();
@@ -56,7 +58,6 @@ std::string simple_translate (translatable t, std::string value);
 int index_from_linecode (std::string);
 int suffix_from_linecode (std::string);
 
-// If this were a class, I would mark these private:
 // Stubs for routines called by translation_functions
 std::string translate_soldiers(const PstLine &) ;
 std::string translate_acres(const PstLine &) ;
