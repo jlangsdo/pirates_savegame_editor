@@ -18,6 +18,7 @@
 #include "PstLine.hpp"
 
 void pack(std::ifstream & in, std::ofstream & out);
+void compare_binary_filestreams(std::ifstream & in1, std::ifstream & in2);
 
 class PstFile {
 public:

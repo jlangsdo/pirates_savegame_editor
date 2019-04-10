@@ -194,7 +194,9 @@ string simple_translate (translatable t, int as_int) {
                 return list.at(as_int);
             } else { return ""; }
         } else if (as_int==-1) {
-            switch (t) { // Perhaps I need a separate array for values at -1, or add one before accessing all arrays.
+            switch (t) {
+                    // Matching the perl code, some arrays have a special response if the value is -1.
+                    // Perhaps I need a separate array for values at -1, or add one before accessing all arrays.
                 case SHIP_TYPE    : return "NIL";
                 case SPECIAL_MOVE : return "NONE";
                     // case CITYNAME     : return "N/A";
@@ -270,7 +272,7 @@ string translate_population_type (const PstLine & i) {
 string translate_event_flags(const PstLine & i) {
     std::bitset<8> asbits(i.v);
     string retval = "";
-    for (int j=0; j<5; j++) {  // Main nations reported only, plus Pirates.
+    for (int j=0; j<6; j++) {  // Main nations reported only, plus Pirates and Indians?
         if (asbits[j]) {
             retval += " and " + simple_translate(FLAG, j);
         }
@@ -791,6 +793,7 @@ void PstLine::read_binary_world_map(ifstream &in, boost::ptr_deque<PstLine> & fe
         }
         value = ss.str();
     }
+    v = -2;    // Prevent MAP lines from being translated, even though FEATURE lines are.
 }
 
 void PstLine::expand_map_value() {
@@ -885,7 +888,7 @@ void PstLine::read_binary(std::ifstream &in) {
             }
             switch (method) {
                 case uFLOAT:
-                    ss << std::right << std::fixed << setprecision(6) << setw(10) << double(v)/1'000'000;
+                    ss << std::right << std::fixed << setprecision(6) << setw(10) << double((unsigned int)v)/1'000'000;
                     break;
                 case mFLOAT:
                     if (v == 0) {

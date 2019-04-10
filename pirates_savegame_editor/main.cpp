@@ -10,6 +10,8 @@
 #include <sstream>
 #include <getopt.h>
 #include <regex>
+#include <cstdio>
+#include "boost/filesystem.hpp"
 #include "RMeth.hpp"
 #include "PstSection.hpp"
 #include "PstLine.hpp"
@@ -24,6 +26,8 @@ using namespace std;
 string find_file(string dir, string file, string suffix);
 void unpack_pg_to_pst(string pg_file, string pst_file);
 void pack_pst_to_pg(string pst_file, string pg_file);
+void test_file_to_test(string save_dir, string file_to_test);
+vector<std::string> find_all_files(string dir, string suffix);
 
 const string usage = R"USAGE(
 
@@ -54,8 +58,9 @@ The advanced switches have not been implemented yet.
 )AUSAGE";
 
 // Filename suffixes
-const std::string pg  = "pirates_savegame";
-const std::string pst = "pst";
+const std::string pg_suffix   = "pirates_savegame";
+const std::string pst_suffix  = "pst";
+const std::string test_suffix = pg_suffix + ".test";
 
 int main(int argc, char **argv)
 {    int c;
@@ -66,12 +71,16 @@ int main(int argc, char **argv)
         {"dir",     required_argument, 0, 'd'},
         {"help",          no_argument, 0, 'h'},
         {"pack",    required_argument, 0, 'p'},
+        {"sweep",         no_argument, 0, 's'},
+        {"test",    required_argument, 0, 't'},
         {"unpack",  required_argument, 0, 'u'},
     };
     
     string unpack;
     string pack;
+    string test;
     string save_dir = "/usr";
+    bool do_sweep = false;
     
     // Get the pirates module ready to go.
     set_up_rmeth();
@@ -87,36 +96,88 @@ int main(int argc, char **argv)
             case 'd': save_dir = optarg; break;
             case 'h':  cout << script_name << usage; return 0;
             case 'p': pack = optarg; break;
+            case 's' : do_sweep = true; break;
+            case 't': test = optarg; break;
             case 'u': unpack = optarg; break;
             default: abort();
+        }
+    }
+    // Except for -help and -advanced_help, we have to process all of the options
+    // before doing anything. -dir might come at the end of the list, and it affects all of the others.
+    
+    // pack, test, and unpack all allow a comma-separated list of files to process.
+    if (pack.size()) {
+        string file_to_pack;
+        std::istringstream tokenStream(pack);
+        while(std::getline(tokenStream, file_to_pack, ',')) {
+            string pst_file = find_file(save_dir, file_to_pack, pst_suffix);
+            string pg_file = regex_replace(pst_file, regex("\\." + pst_suffix + "$"), "." + pg_suffix);
+            pack_pst_to_pg(pst_file, pg_file);
+        }
+    }
+    if (do_sweep) {
+        auto file_list = find_all_files(save_dir, pg_suffix);
+        cout << "Preparing to unpack an test " << file_list.size() << " files\n";
+        for (auto afile : file_list) {
+            test_file_to_test(save_dir, afile);
+        }
+        cout << "\nAll savegame files unpacked and regressions passed\n";
+    }
+    
+    if (test.size()) {
+        string file_to_test;
+        std::istringstream tokenStream(test);
+        while(std::getline(tokenStream, file_to_test, ',')) {
+            test_file_to_test(save_dir, file_to_test);
         }
     }
     if (unpack.size()) {
         string file_to_unpack;
         std::istringstream tokenStream(unpack);
         while(std::getline(tokenStream, file_to_unpack, ',')) {
-            string pg_file = find_file(save_dir, file_to_unpack, pg);
-            string pst_file = regex_replace(pg_file, regex("\\." + pg + "$"), "." + pst);
+            string pg_file = find_file(save_dir, file_to_unpack, pg_suffix);
+            string pst_file = regex_replace(pg_file, regex("\\." + pg_suffix + "$"), "." + pst_suffix);
             unpack_pg_to_pst(pg_file, pst_file);
         }
     }
-    if (pack.size()) {
-        string file_to_pack;
-        std::istringstream tokenStream(pack);
-        while(std::getline(tokenStream, file_to_pack, ',')) {
-            string pst_file = find_file(save_dir, file_to_pack, pst);
-            string pg_file = regex_replace(pst_file, regex("\\." + pst + "$"), "." + pg);
-            pack_pst_to_pg(pst_file, pg_file);
-        }
+}
+
+void compare_binary_files(std::string file1, std::string file2) {
+    ifstream fs1 = ifstream(file1, ios::binary);   // Looks like opend()
+    if (! fs1.is_open()) {
+        cerr << "Failed to read from " << file1 << "\n";
+        exit(1);
     }
+    ifstream fs2 = ifstream(file2, ios::binary);
+    if (! fs2.is_open()) {
+        cerr << "Failed to read from " << file2 << "\n";
+        exit(1);
+    }
+    cout << "Comparing " << file1 << " to " << file2 << "\n";
+    compare_binary_filestreams(fs1,fs2);
+    fs1.close();
+    fs2.close();
+}
+
+void test_file_to_test(string save_dir, string file_to_test) {
+    string pg_file = find_file(save_dir, file_to_test, pg_suffix);
+    string pst_file = regex_replace(pg_file, regex("\\." + pg_suffix + "$"), "." + pst_suffix);
+    unpack_pg_to_pst(pg_file, pst_file);
+
+    string test_file = regex_replace(pst_file, regex("\\." + pst_suffix + "$"), "." + test_suffix);
+    pack_pst_to_pg(pst_file, test_file);
+    
+    compare_binary_files(pg_file, test_file);  // This routine will abort() on failure.
+    std::remove(test_file.c_str());
+    cout << "PASS!\n";
 }
 
 string find_file(string dir, string file, string suffix) {
     // finds a file that is to be packed or unpacked
     // returns the full pathname of the file.
     string game = file;
-    game = regex_replace(game, regex("\\." + pst), "");
-    game = regex_replace(game, regex("\\." +  pg), "");
+    game = regex_replace(game, regex("\\." + pst_suffix), "");
+    game = regex_replace(game, regex("\\." +  pg_suffix), "");
     
     const string possible_files[] = {
         game + "." + suffix,
@@ -178,3 +239,18 @@ void pack_pst_to_pg(string pst_file, string pg_file) {
     pg_out.close();
 }
 
+vector<std::string> find_all_files(string dir, string suffix) {
+    using namespace boost::filesystem;
+    using namespace boost;
+    vector<std::string> results;
+    path dir_path(dir);
+    if (is_directory(dir_path)) {
+        for (directory_entry& x : directory_iterator(dir_path)) {
+            string afile = x.path().string();
+            if (regex_search(afile, regex("." + suffix + "$"))) {
+                results.push_back(afile);
+            }
+        }
+    }
+    return results;
+}

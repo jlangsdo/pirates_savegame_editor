@@ -272,6 +272,12 @@
 				CODE_SIGN_STYLE = Automatic;
 				"HEADER_SEARCH_PATHS[arch=*]" = /usr/local/boost_1_69_0/include/;
 				"LIBRARY_SEARCH_PATHS[arch=*]" = /usr/local/boost_1_69_0/lib/;
+				OTHER_LDFLAGS = (
+					"-l",
+					boost_system,
+					"-l",
+					boost_filesystem,
+				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Debug;
@@ -280,6 +286,12 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
+				OTHER_LDFLAGS = (
+					"-l",
+					boost_system,
+					"-l",
+					boost_filesystem,
+				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Release;

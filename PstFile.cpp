@@ -18,6 +18,24 @@
 #include <vector>
 using namespace std;
 
+
+void compare_binary_filestreams(std::ifstream & in1, std::ifstream & in2) {
+    constexpr int c = 16;  // This is like diff, but avoiding the unix system call to be portable with Windows.
+    char b1[c];
+    char b2[c];
+    
+    while(in1) {
+        in1.read((char*)&b1, c);
+        in2.read((char*)&b2, c);
+        string s1(b1,c);
+        string s2(b2,c);
+        if (s1 != s2) {
+            cout << "Failed at byte " << in1.tellg() << "\n";
+            abort();
+        }
+    }
+}
+
 void pack(std::ifstream & in, std::ofstream & out) {
     PstFile contents{};
     contents.read_text(in);
@@ -83,11 +101,8 @@ void PstFile::read_text(std::ifstream & in) {
 }
 void PstFile::write_pg(std::ofstream & out) {
     for (auto section : section_vector) {
-        if (data[section.name].size() > 0 ) {
-            cout << "Writing " << section.name << "\n";
-            
+        if (data[section.name].size() > 0 ) {            
             if (is_world_map(section.splits.front().method)) {
-                cout << "   Careful, that's a world_map section\n";
                 // First, inflate all of the non-FEATURE strings to full size.
                 for (auto&& pair : data[section.name]) {
                     if (pair.second->method != FEATURE) {
@@ -100,9 +115,7 @@ void PstFile::write_pg(std::ofstream & out) {
                                                            // pair.first = 1'032'202'000'000'000'000
                         int row = sortcode_get_index(pair.first,1);
                         int col = sortcode_get_index(pair.first,2);
-                        if (row <= 35) {
-                            // Just for debug
-                        }
+                        
                         // 293 is a magic number: the width of a map.
                         // For a Feature at FeatureMap_35_202,
                         // we need to edit FeatureMap_35_293 column 202, so construct the appropriate line_code, and edit that PstLine.
@@ -112,6 +125,7 @@ void PstFile::write_pg(std::ofstream & out) {
                     }
                 }
             }
+            // Now we are ready to write out the binary for the section.
             for (auto&& pair : data[section.name]) {
                 pair.second->write_binary(out);
             }
