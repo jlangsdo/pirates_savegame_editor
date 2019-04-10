@@ -26,7 +26,7 @@ public:
 private:
     void remove_features();
     void apply_features();
-    std::unordered_map<std::string, std::map<double, std::unique_ptr<PstLine> > >  data;
+    std::unordered_map<std::string, std::map<unsigned long long, std::unique_ptr<PstLine> > >  data;
 };
 
 

@@ -32,7 +32,8 @@ public:
     void read_binary (std::ifstream &in);
     void write_text (std::ofstream &out);
     void write_binary (std::ofstream &out);
-    
+    void expand_map_value();
+    void update_map_value(int column, std::string value);
     std::string mcode();
     std::string get_comment();
     std::string get_translation();

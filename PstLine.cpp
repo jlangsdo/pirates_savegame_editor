@@ -793,6 +793,36 @@ void PstLine::read_binary_world_map(ifstream &in, boost::ptr_deque<PstLine> & fe
     }
 }
 
+void PstLine::expand_map_value() {
+    // This is the reverse of read_binary_world_map
+    // Take the compressed map (where one bit indicates sea or land)
+    // and expand it to a string that looks like BULK: 2 chars per byte of binary.
+        
+    const string sea  = "00";
+    const string land = method==CMAP ? "09" : "ff";
+    stringstream ss;
+    stringstream bs;
+    
+    int compbytes = bytes/4;
+    if (bytes % 4) compbytes++;
+    
+    for (int b=0; b<compbytes; b++) {
+        char hexchar = method==SMAP ? '0' : value[b];                               // Read one character (or assume 0 for SMAP)
+        int intval = (hexchar >= 'a') ? (hexchar - 'a' + 10) : (hexchar - '0');     // convert to decimal.
+        std::bitset<4> asbits(intval);                                              // Convert to binary
+        for (int j=0; j<4; j++) {
+            if (asbits[3-j]) {                        // Now for each bit of the binary, write a byte
+                ss << land;
+            } else {
+                ss << sea;
+            }
+        }
+    }
+    // Replace the compressed value in the PstLine with this expanded value.
+    value = ss.str();
+    //
+}
+
 void PstLine::read_binary(std::ifstream &in, boost::ptr_deque<PstLine> & features) {
     if (is_world_map(method)) {
         this->read_binary_world_map(in, features);
@@ -881,55 +911,69 @@ void PstLine::read_binary(std::ifstream &in) {
     }
 }
 
+void PstLine::update_map_value(int column, std::string feature_value) {
+    if (! is_world_map(method))  throw logic_error("Cannot update_map_value on a non-map rmeth!");
+    if (value.length() < 293*2)  throw logic_error("Cannot update_map_value before expanding map value");
+    
+    value.replace(column*2,2,feature_value);
+}
+
 void PstLine::write_binary(std::ofstream & out) {
-    unsigned int vcopy = 0;
-    int bcopy = bytes;
+    
+    // For the numeric types, first convert to an unsigned int with a length.
+    // This is also used by TEXT for the length-of-string int, and for HEX (which converts back to an int)
+    unsigned int data = 0;
+    int bytes_to_write = bytes;
+
     switch (method) {
+        case FEATURE: // FEATURE does not write directly, it is used to edit the map lines.
+            return;
+        case HEX:   // For HEX, the byte order is reversed from the text. Also there are periods to skip.
+            for (auto b=0; b<bytes; b++) {
+                out << (unsigned char)stoi(value.substr(3*(bytes-b-1),2), nullptr, 16);
+            }
+            return;
+        case BULK : // BULK doesn't go through vcopy. Just read the hex 2 characters at a time to write one byte.
+        case SMAP : // The three worldmaps have been expanded so they look like BULK.
+        case CMAP :
+        case FMAP :
+            for (auto b=0; b<bytes; b++) {
+                out << (unsigned char)stoi(value.substr(2*b,2), nullptr, 16);
+            }
+            return;
         case TEXT:
-            vcopy = (unsigned int)value.length();
-            bcopy = 4;
+            data = (unsigned int)value.length();
+            bytes_to_write = 4;
             break;
         case INT:
-            vcopy = (unsigned int)stoul(value);
+            data = (unsigned int)stoul(value);
             break;
         case SHORT:
         case CHAR:
         case LCHAR:
-            vcopy = (unsigned int)(stoi(value));
+            data = (unsigned int)(stoi(value));
             break;
         case uFLOAT:
-             vcopy = (unsigned int)(stod(value) * 1000000);
+             data = (unsigned int)(stod(value) * 1000000+.5);
             break;
         case mFLOAT:
-            vcopy = (unsigned int)(stod(value) * 1000);
+            data = (unsigned int)(stod(value) * 1000+.5);
             break;
         case BINARY:
-            vcopy = (unsigned int)stoul(value,nullptr,2);
-            break;
-        case HEX:
-            for (auto b=0; b<bytes; b++) {
-                vcopy = (vcopy << 8) + stoi(value.substr(3*b,2), nullptr, 16);
-            }
+            data = (unsigned int)stoul(value,nullptr,2);
             break;
         case ZERO:
         default:
-            vcopy = 0;
+            data = 0;
     }
-    switch (method) {
-        case FEATURE:
-            break;
-        case BULK:
-            for (auto b=0; b<bytes; b++) {
-                out << (unsigned char)stoi(value.substr(2*b,2), nullptr, 16);
-            }
-            break;
-        default:
-            for (auto b=0;b<bcopy;b++) {
-                out << (unsigned char)(vcopy % 256);
-                vcopy = vcopy >> 8;
-            }
-            break;
+    
+    // Now send the numeric data out in binary form.
+    for (auto b=0;b<bytes_to_write;b++) {
+        out << (unsigned char)(data % 256);
+        data = data >> 8;
     }
+      
+    // For TEXT, we have only sent the length so far, so now send the actual text, followed by padding if necessary.
     if (method == TEXT) {
         out << value;
         for (auto b=0; b<bytes; b++) {
