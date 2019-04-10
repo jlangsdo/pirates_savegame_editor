@@ -169,7 +169,7 @@ string translate_pirate_hangout(const PstLine & i) {
     return simple_translate(CITYNAME, i.v);
 }
 string translate_population(const PstLine & i) {
-    return to_string( 200 * i.v);
+    return to_string( 200 * (int)(unsigned char)i.v);
 }
 
 string translate_following(const PstLine & i) {
@@ -318,6 +318,7 @@ string translate_event(const PstLine & i) {
                 case 38:
                     return simple_translate(SPECIALIST, i.v);
                 case 37:
+                    subevent = i.v; // Need to store this data if this is an upgrade.
                     return simple_translate(ITEM, i.v);
                 case 44:
                     return "belonging to " + simple_translate(PIRATE, i.v);
@@ -337,7 +338,7 @@ string translate_event(const PstLine & i) {
                     return (i.v > 0) ? "Governor encouraged plundering of " + translate_event_flags(i) : "";
                 case 37:
                     if (i.v == 1) {
-                        return "Upgrade to " + simple_translate(BETTER_ITEM, i.v);
+                        return "Upgrade to " + simple_translate(BETTER_ITEM, subevent);
                     } else { return ""; }
                 case 39: case 21: case 69:
                     return simple_translate(CITYNAME, i.v);
@@ -366,7 +367,7 @@ string translate_event(const PstLine & i) {
             break;
         default : ;
     }
-    if (i.v != 0) { return "???"; }  // Log item not yet translated. Often -1.
+    if (i.v != 0 && i.v != -1) { return "???"; }  // Log item not yet translated. Often -1.
     return "";
 }
 
@@ -635,7 +636,8 @@ void augment_decoder_groups() {
 }
 
 string translate_date(const PstLine & i) { // Translate the datestamp into a date in game time.
-    double stamp = i.v;
+    if (i.v == -1) { return ""; }
+    double stamp = (unsigned int)i.v;   // Leaving it negative would be more correct, but I'm matching perl here.
     if (stamp == 0 || stamp == -1) { return ""; }
     
     // I have no idea where the 197.2 comes from; in this formula.
@@ -905,6 +907,8 @@ void PstLine::read_binary(std::ifstream &in) {
                     // However, we might want the first byte as a number 0..16 for lookup
                     v = ((unsigned char)b[3]+8)/16;
                     break;
+                case CHAR:
+                    v = (int)(unsigned char)v;
                 default:
                     ss << to_string(v);
             }
