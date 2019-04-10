@@ -103,11 +103,11 @@ void PstFile::write_pg(std::ofstream & out) {
                         if (row <= 35) {
                             // Just for debug
                         }
-                        // We need to edit FeatureMap_35_293 column 202, so construct the appropriate line_code
+                        // 293 is a magic number: the width of a map.
+                        // For a Feature at FeatureMap_35_202,
+                        // we need to edit FeatureMap_35_293 column 202, so construct the appropriate line_code, and edit that PstLine.
                         unsigned long long target = index_to_sortcode("_" + to_string(row) + "_293");
                         if (data[section.name].count(target) != 1) throw logic_error ("Tried to add features to missing row");
-                        // Take the value from the FEATURE and use it to update the value in the map line.
-                        
                         data[section.name].at(target)->update_map_value(col, pair.second->value);
                     }
                 }
