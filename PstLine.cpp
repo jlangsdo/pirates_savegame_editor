@@ -367,7 +367,7 @@ string translate_event(const PstLine & i) {
             break;
         default : ;
     }
-    if (i.v != 0 && i.v != -1) { return "???"; }  // Log item not yet translated. Often -1.
+    if (i.v != 0 && (i.v != -1 || i.method==INT)) { return "???"; }  // Log item not yet translated. Often -1.
     return "";
 }
 

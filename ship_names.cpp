@@ -698,7 +698,7 @@ void load_pirate_shipnames() {
 
 string translate_shipname(const PstLine & i) {
     if (last_flag == "") { return "NIL"; }
-    if (last_shiptype < 0 || last_shiptype > shipname_type_by_class.size()) { return "NIL"; }
+    if (last_shiptype < 0 ) { return "NIL"; }
 
     // Assemble the shipname_group a combination of the flag and shipname_group
     // to know which list of shipnames to use - merchant, warship, or pirate.
@@ -721,5 +721,5 @@ string translate_shipname(const PstLine & i) {
     } else {
         throw logic_error("Bad shipname_group " + shipname_group);
     }
-    return "NIL";
+    return "";  
 }
