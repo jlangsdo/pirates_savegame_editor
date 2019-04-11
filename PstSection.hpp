@@ -13,7 +13,7 @@
 #include <string>
 #include "RMeth.hpp"
 
-void unpack(std::ifstream & in, std::ofstream & out);
+void unpackPst(std::ifstream & in, std::ofstream & out);
 int index_from_linecode (std::string line_code);
 
 struct PstSplit {

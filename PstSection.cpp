@@ -145,7 +145,7 @@ unordered_map<string,list<PstSplit>> subsection_manual_decode = {
     {"Top10_x_1",     {{BINARY}, {ZERO,3}}},      // 4 = 1+3
 };
 
-void unpack(ifstream & in, ofstream & out) {
+void unpackPst(ifstream & in, ofstream & out) {
     try {
         for (auto section : section_vector) {
             out << "## " << section.name << " starts at byte " << in.tellg() << "\n";

@@ -36,7 +36,7 @@ void compare_binary_filestreams(std::ifstream & in1, std::ifstream & in2) {
     }
 }
 
-void pack(std::ifstream & in, std::ofstream & out) {
+void packPst(std::ifstream & in, std::ofstream & out) {
     PstFile contents{};
     contents.read_text(in);
     contents.write_pg(out);

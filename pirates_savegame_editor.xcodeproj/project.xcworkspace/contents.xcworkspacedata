@@ -2,6 +2,12 @@
 <Workspace
    version = "1.0">
    <FileRef
+      location = "group:/Users/langsdorf/Documents/c/pirates_savegame_editor/pirates_savegame_editor/PiratesFiles.cpp">
+   </FileRef>
+   <FileRef
+      location = "group:/Users/langsdorf/Documents/c/pirates_savegame_editor/pirates_savegame_editor/PiratesFiles.hpp">
+   </FileRef>
+   <FileRef
       location = "group:/Users/langsdorf/Documents/c/pirates_savegame_editor/pirates_savegame_editor/RMeth.cpp">
    </FileRef>
    <FileRef
