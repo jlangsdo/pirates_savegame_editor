@@ -831,6 +831,9 @@ void PstLine::read_binary(std::ifstream &in, boost::ptr_deque<PstLine> & feature
     }
 }
 
+constexpr char hexmap[] = {'0', '1', '2', '3', '4', '5', '6', '7',
+    '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
+
 void PstLine::read_binary(std::ifstream &in) {
     char b[2000] = "";
     stringstream ss;
@@ -848,10 +851,17 @@ void PstLine::read_binary(std::ifstream &in) {
             break;
         case BULK :
             in.read((char*)&b, bytes);
-            for (int i=0;i<bytes;i++) {
-                ss << std::noshowbase << std::hex << nouppercase << setw(2) << setfill('0') << (int)(unsigned char)b[i];
+            // Old method, somewhat slow:
+            // ss << std::noshowbase << std::hex << nouppercase << setfill('0');
+            // for (int i=0;i<bytes;i++) {
+            //    ss << setw(2) << (int)(unsigned char)b[i];
+            // }
+            value = string(bytes * 2, ' ');
+            for (int i = 0; i < bytes; ++i) {
+                value[2 * i]     = hexmap[(b[i] & 0xF0) >> 4];
+                value[2 * i + 1] = hexmap[b[i] & 0x0F];
             }
-            value = ss.str();
+           
             break;
         case ZERO :
             in.read((char*)&b, bytes);
