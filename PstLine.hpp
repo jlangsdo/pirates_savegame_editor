@@ -22,9 +22,11 @@ public:
     std::string value;
     rmeth method;
     int bytes = standard_rmeth_size.at(method);
+    std::list<std::string> lca = {};   // line_code_aliases
     
-    PstLine(std::string lc, rmeth rm, int v, std::string value) : line_code(lc), method(rm), v(v), value(value) {}
-    PstLine(PstSection subsection) : line_code(subsection.name), method(subsection.splits.front().method), bytes(subsection.splits.front().bytes) {}
+    PstLine(std::string lc, rmeth rm, int v, std::string value, std::string al) :
+        line_code(lc), method(rm), v(v), value(value), lca({al}) {}
+    PstLine(PstSection subsection) : line_code(subsection.name), method(subsection.splits.front().method), bytes(subsection.splits.front().bytes), lca(subsection.lca) { }
     PstLine(rmeth rm, int bytes, std::string value) : method(rm), bytes(bytes), value(value) {}
     
     void read_binary (std::ifstream &in, boost::ptr_deque<PstLine> & features);
@@ -37,6 +39,7 @@ public:
     std::string mcode();
     std::string get_comment();
     std::string get_translation();
+    std::pair<std::string, std::string> get_translation_and_comment();
 };
 
 

@@ -10,7 +10,6 @@
 #define PstFile_hpp
 
 #include <stdio.h>
-#include <boost/ptr_container/ptr_map.hpp>
 #include <string>
 #include <map>
 #include <vector>

@@ -546,11 +546,11 @@ unordered_map<string,decode_for_line> line_decode = {
     {"TreasureMap_x_68_3",{"treasure already found"}},
     {"TreasureMap_x_69",  {"", PIRATE}},
     {"TreasureMap_x_x",   {"", TREASURE_MAP}},
-    {"TreasureMap_0_0",   {"Pirate Treasure"}},
+    {"TreasureMap_0_0",   {"Pirate Treasure", NIL}},
     {"TreasureMap_1_0",   {"Lost Relative"}},
     {"TreasureMap_2_0",   {"Lost City"}},
     {"TreasureMap_3_0",   {"Montalban's Hideout"}},
-    {"TreasureMap_0_16",  {"Pirate Treasure"}},
+    {"TreasureMap_0_16",  {"Pirate Treasure", NIL}},
     {"TreasureMap_1_16",  {"Lost Relative"}},
     {"TreasureMap_2_16",  {"Lost City"}},
     {"TreasureMap_3_16",  {"Montalban's Hideout"}},
@@ -662,30 +662,24 @@ string translate_date(const PstLine & i) { // Translate the datestamp into a dat
 }
 
 string PstLine::get_translation() {
-    string temp_line_code = line_code;
-    while(true) { // Translate based on Log_5_6, Log_x_6, or Log_x_x
-        if (line_decode.count(temp_line_code) && line_decode.at(temp_line_code).t != NIL) {
-            return translate(line_decode.at(temp_line_code).t, *this);
-        } else {
-            if (! regex_search(temp_line_code, regex("_\\d"))) { break; }
-            temp_line_code = regex_replace(temp_line_code, regex("_\\d+"), "_x", std::regex_constants::format_first_only);
+    // Created lca to eliminate regex operations. We need to check Ship_1_2_3, Ship_x_2_3, and Ship_x_x_3
+    for (string lc : lca) {
+        if (line_decode.count(lc) && line_decode.at(lc).t != NIL) {
+            return translate(line_decode.at(lc).t, *this);
         }
     }
     return "";
 }
 
 string PstLine::get_comment() {
-    string temp_line_code = line_code;
-    while(true) { // Improved, now handles Log_x_x and we don't need to pass subsection_x.
-        if (line_decode.count(temp_line_code)) {
-            return line_decode.at(temp_line_code).comment;
-        } else {
-            if (! regex_search(temp_line_code, regex("_\\d"))) { break; }
-            temp_line_code = regex_replace(temp_line_code, regex("_\\d+"), "_x", std::regex_constants::format_first_only);
+    for (string lc : lca) {
+        if (line_decode.count(lc) && line_decode.at(lc).comment.length() > 0) {
+            return line_decode.at(lc).comment;
         }
     }
     return "";
 }
+
 
 void check_for_specials(std::ifstream &in, std::ofstream &out, string line_code) {
     // The savegame file has variable length parts at the beginning and end,
@@ -713,8 +707,8 @@ void print_field (std::ofstream &out, string value, int default_width) {
 void PstLine::write_text(std::ofstream &out) {
     
     string typecode = mcode();
+    string comment =  get_comment();
     string translation = get_translation();
-    string comment = get_comment();
     
     // Perl script reports 4-byte integers as unsigned.
     // This is misleading, they act more like signed, so I am holding them
@@ -784,7 +778,7 @@ void PstLine::read_binary_world_map(ifstream &in, boost::ptr_deque<PstLine> & fe
             // Anomoly. Add to the features vector for printing after the main map.
             stringstream ss;
             ss << std::noshowbase << std::hex << nouppercase << setw(2) << setfill('0') << (int)(unsigned char)b[i];
-            features.push_back( new PstLine{line_code + "_" + to_string(i), FEATURE, b[i],  ss.str()});
+            features.push_back( new PstLine{line_code + "_" + to_string(i), FEATURE, b[i],  ss.str(), lca.back() + "_x"});
         }
     }
     // Now compressing the single bits of the map into hex for printing. SMAP would be all zeros, so it saves nothing.
@@ -838,7 +832,7 @@ void PstLine::read_binary(std::ifstream &in, boost::ptr_deque<PstLine> & feature
 }
 
 void PstLine::read_binary(std::ifstream &in) {
-    char b[100] = "";
+    char b[2000] = "";
     stringstream ss;
     int size_of_string;
     switch (method) {
@@ -853,16 +847,16 @@ void PstLine::read_binary(std::ifstream &in) {
             }
             break;
         case BULK :
+            in.read((char*)&b, bytes);
             for (int i=0;i<bytes;i++) {
-                in.read((char*)&b, 1);
-                ss << std::noshowbase << std::hex << nouppercase << setw(2) << setfill('0') << (int)(unsigned char)b[0];
+                ss << std::noshowbase << std::hex << nouppercase << setw(2) << setfill('0') << (int)(unsigned char)b[i];
             }
             value = ss.str();
             break;
         case ZERO :
+            in.read((char*)&b, bytes);
             for (int i=0;i<bytes;i++) {
-                in.read((char*)&b, 1);
-                if (b[0] != 0) throw logic_error("Non-zero found in expected zero-string");
+                if (b[i] != 0) throw logic_error("Non-zero found in expected zero-string");
             }
             value = "zero_string";
             break;

@@ -169,13 +169,13 @@ void PstSection::unpack (ifstream & in, ofstream & out) {
         
         for (int c=offset; c<split.count+offset;c++) {
             
-            PstSection subsection{name + "_" + to_string(c), split};
+            PstSection subsection{*this, c, split};
             bool subsection_is_actually_single_line = true;  // We'll find out.
             
             // This while loop progressively changes the indices in the subsection to _x, to look it up in the maps.
             string temp_line_code = subsection.name;
-            while(true) {
-                
+            for (auto temp_line_code : subsection.lca) {
+    
                 // subsection_recharacterize replaces the PstSplit with an alternate split, just for this subsection..
                 if (subsection_recharacterize.count(temp_line_code)) {
                     subsection.splits = {subsection_recharacterize.at(temp_line_code)};
@@ -201,7 +201,7 @@ void PstSection::unpack (ifstream & in, ofstream & out) {
                         new_splits = subsection_manual_decode.at(temp_line_code);
                     }
                     
-                    int byte_count_check = 0;
+                    int byte_count_check = 0; // Just checking that it adds up.
                     for (auto subinfo : new_splits) {
                         byte_count_check += subinfo.count*subinfo.bytes;
                     }
@@ -211,14 +211,11 @@ void PstSection::unpack (ifstream & in, ofstream & out) {
                         abort();
                     }
                     
-                    // Our subsection will now be treated as a Section.
-                    auto subsection_as_section = PstSection{subsection.name, new_splits};
-                    subsection_as_section.unpack(in, out);
+                    // Our subsection will now be treated as a Section, with its own new splits.
+                    subsection.splits = new_splits;
+                    subsection.unpack(in, out);
                     break;
                 }
-                
-                if (! regex_search(temp_line_code, regex("_\\d"))) { break; }
-                temp_line_code = regex_replace(temp_line_code, regex("_\\d+"), "_x", std::regex_constants::format_first_only);
             }
             
             if (subsection_is_actually_single_line) {
