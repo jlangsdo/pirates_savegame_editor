@@ -28,7 +28,8 @@ public:
         line_code(lc), method(rm), v(v), value(value), lca({al}) {}
     PstLine(PstSection subsection) : line_code(subsection.name), method(subsection.splits.front().method), bytes(subsection.splits.front().bytes), lca(subsection.lca) { }
     PstLine(rmeth rm, int bytes, std::string value) : method(rm), bytes(bytes), value(value) {}
-    
+    PstLine(std::string lc, rmeth rm, int bytes, std::string value) : line_code(lc), method(rm), bytes(bytes), value(value) {}
+    PstLine(const PstLine & pl2) = default;
     void read_binary (std::ifstream &in, boost::ptr_deque<PstLine> & features);
     void read_binary_world_map (std::ifstream &in, boost::ptr_deque<PstLine> & features);
     void read_binary (std::ifstream &in);

@@ -38,11 +38,11 @@ public:
         read_text(pst_in);
         pst_in.close();
     }
+    //     Map   of    sections ->  map of sortnum -> PstLine
+    std::unordered_map<std::string, std::map<unsigned long long, std::unique_ptr<PstLine> > >  data;
 private:
     void remove_features();
     void apply_features();
-    //     Map   of    sections ->  map of sortnum -> PstLine
-    std::unordered_map<std::string, std::map<unsigned long long, std::unique_ptr<PstLine> > >  data;
 };
 
 

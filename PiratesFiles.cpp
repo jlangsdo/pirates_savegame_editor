@@ -182,7 +182,45 @@ std::vector<std::string> find_pg_files() {
     return results;
 }
 void splice(std::string infile, std::string donor, std::string outfiles,
-            std::string splice, std::string clone, std::string set, bool do_auto,
+            std::string splices, std::string clone, std::string set, bool do_auto,
             std::string notfiles) {
+    PstFile inPst(infile);
+    PstFile donorPst(donor);
+    
+    map<std::string, vector<std::string> > splice_by_section;
+    for (auto asplice : split_by_commas(splices)) {
+        auto first_underscore = asplice.find('_');
+        string section_name = asplice.substr(0,first_underscore);
+        string line_code = asplice.substr(first_underscore, string::npos);
+        splice_by_section[section_name].emplace_back(line_code);
+    }
+    
+    PstFile outPst;
+    for (auto section : section_vector) {
+        if (splice_by_section.count(section.name)) {
+            cout << "Splicing in section " << section.name << "\n";
+        }
+        for (auto && line_pair : inPst.data[section.name]) {
+            bool did_splice_this_line = false;
+            if (splice_by_section.count(section.name)) {
+                for (auto splice_line : splice_by_section[section.name]) {
+                    if (line_pair.second->line_code == splice_line) {
+                        outPst.data[section.name].emplace(line_pair.first, std::make_unique<PstLine>(*donorPst.data[section.name][line_pair.first]));
+                        did_splice_this_line = true;
+                    }
+                }
+            }
+            if (! did_splice_this_line ) {
+                outPst.data[section.name].emplace(line_pair.first, std::make_unique<PstLine>(*line_pair.second));
+            }
+        }
+    }
+    
+    string outfile = save_dir + "/" + outfiles + "." + pg_suffix;
+    ofstream pg_out(outfile);
+    if (! pg_out.is_open()) throw runtime_error("Failed to write_to " + outfile);
+    cout << "Writing " << outfile << "\n\n";
+    outPst.write_pg(pg_out);
+    unpack(outfile);
     
 }

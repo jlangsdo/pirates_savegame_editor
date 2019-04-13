@@ -120,7 +120,7 @@ void PstFile::read_text(std::ifstream & in) {
         unsigned long long sortcode = index_to_sortcode(line_code);
         
         rmeth method = char_for_method.right.at(meth_code);
-        data[section].emplace(sortcode, std::make_unique<PstLine>(method, bytes, value) );
+        data[section].emplace(sortcode, std::make_unique<PstLine>(line_code, method, bytes, value) );
     }
     if (in.bad())
         throw runtime_error("Error while reading pst file");
