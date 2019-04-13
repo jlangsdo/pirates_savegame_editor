@@ -86,6 +86,58 @@ int sortcode_get_index(unsigned long long sortcode, const int index) {
     return (int) (sortcode % 1000);
 }
 
+std::vector<size_t> special_fast_regex(const std::string & line, const std::string & front_set, const std::string & back_set ) {
+    // This routine optimizes searching in a string to find the locations of substrings that can be pulled out
+    // using substr. It replaces a regex that is of the special form ^([^a]+)([^b+])...(.*?)..([^y+])([^z+])$
+    // where you can find all of the boundaries by making a pass from the front followed by a pass from the back.
+    // The input values are the tokens the indicate passing from one capture group to the next.
+    // Note that d, D act like \d, \D, and S acts like not-space.
+    size_t rsize = front_set.length() + back_set.length()+2;
+    auto r = std::vector<size_t>(rsize);
+    r[0] = 0;
+    size_t fsize = front_set.length();
+    for (size_t i=0; i < fsize; ++i) {
+        switch (front_set[i]) {
+            case 'D':
+                r[i+1] = line.find_first_not_of("1234567890", r[i]);
+                break;
+            case 'S':
+                r[i+1] = line.find_first_not_of(" ", r[i]);
+                break;
+            case 'd':
+                r[i+1] = line.find_first_of("1234567890", r[i]);
+                break;
+            default:
+                r[i+1] = line.find(front_set[i],r[i]);
+        }
+    }
+    r[rsize-1] = string::npos;
+    size_t bsize = back_set.length();
+    for(size_t i=bsize; i!=0; --i) {
+        switch(back_set[i-1]) {
+            case 'D':
+                r[fsize+i] = line.find_last_not_of("1234567890",r[fsize+i+1]);
+                break;
+            case 'S':
+                r[fsize+i] = line.find_last_not_of(" ",r[fsize+i+1]);
+                break;
+            case 'd':
+                r[fsize+i] = line.find_last_of("1234567890",r[fsize+i+1]);
+                break;
+            default:
+                r[fsize+i] = line.rfind(back_set[i-1],r[fsize+i+1]);
+        }
+    }
+    // When we find from the back, the boundary is shifted off-by-one.
+    for(size_t i=bsize; i!=0; --i) { ++r[fsize+i]; }
+    return r;
+}
+
+inline
+std::string special_fast_regex_result(const std::string & str, const std::vector<size_t> & r, size_t index) {
+    return str.substr(r[index],r[index+1]-r[index]);
+}
+
 //                               Section1 Number2     rmeth3  bytes4          value5    comments/translation
 auto const line_regex = regex(R"(([^_ ]+)(_\S+)\s+:\s+([^\W\d]+)(\d+)\s+:\s+(.*?)\s+:.*)");
 void PstFile::read_text(std::ifstream & in) {
@@ -95,31 +147,16 @@ void PstFile::read_text(std::ifstream & in) {
         if (line[0] == '#') { continue; } // Strip out comments.
         
         // Attempting to avoid the regex above.
-        size_t line_l = line.length();
-        size_t index = line.find_first_of('_');
-        size_t last_index = index; // index at _
-        string section   = line.substr(0, index);
-        index = line.find_first_of(' ', index);
-        string line_code = line.substr(last_index, index-last_index);
-        index = line.find_first_of(':', index);       // Index at :
-        last_index = line.find_first_not_of(' ', index+1); // last_index now at start of meth_code
-        for(index = last_index; (line[index] < '0' || line[index] > '9') && index<line_l; ++index) {} // index at start of bytes
-        string meth_code = line.substr(last_index, index-last_index);
-        last_index = line.find_first_of(' ', last_index);  // last_index now at space
-        int bytes = stoi( line.substr(index, last_index-index));
-        index = line.find_first_of(':', last_index); // Index now at colon before value
-        index = line.find_first_not_of(' ', index+1); // Index at start of value;
-        last_index = line.find_first_of(':', index); // last_index at the colon after value
-        last_index = line.find_last_not_of(' ', last_index-1); // last_index now at end of value;
-        string value = line.substr(index, last_index-index+1);
-        
-        //   std::smatch matches;    // same as std::match_results<string::const_iterator> sm;
-        //   if (std::regex_match(line, matches, line_regex, std::regex_constants::match_default)) {
+        auto r = special_fast_regex(line, "_ : Sd : S", "S :");
+        string section   = special_fast_regex_result(line, r, 0);
+        string line_code = special_fast_regex_result(line, r, 1);
+        rmeth method =   char_for_method.right.at(special_fast_regex_result(line, r, 5));
+        int bytes   = stoi(special_fast_regex_result(line, r, 6));
+        string value     = special_fast_regex_result(line, r, 10);
         
         // Convert the line_code numbers into a big integer for quick sorting.
         unsigned long long sortcode = index_to_sortcode(line_code);
         
-        rmeth method = char_for_method.right.at(meth_code);
         data[section].emplace(sortcode, std::make_unique<PstLine>(line_code, method, bytes, value) );
     }
     if (in.bad())
