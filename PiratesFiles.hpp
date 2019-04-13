@@ -28,7 +28,7 @@ std::vector<std::string> find_pg_files();
 std::vector<std::string> split_by_commas(std::string);
 void comparePg(std::string afile);
 void splice(std::string infile, std::string donor, std::string outfiles,
-            std::string splice, std::string clone, std::string set, bool do_auto, std::string notfiles);
+            std::string splice, std::string clone, std::string set, bool do_auto, std::string notfiles, std::string suffix=pg_suffix);
 void splice_no_auto(std::string infile, std::string donorfile, std::string outfiles,
                     std::string splices);
 

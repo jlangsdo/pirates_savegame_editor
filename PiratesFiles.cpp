@@ -155,7 +155,6 @@ void unpack(std::string afile) {
 void testpack(string afile) {  pack(afile, test_suffix); }
 void pack(string afile)     {  pack(afile, pg_suffix); }
 void pack(string afile, string out_suffix) {
-    
     PstFile myPst(afile, pst_suffix);
     string pg_file = regex_replace(myPst.filename, regex(pst_suffix + "$"), out_suffix);
     
@@ -181,46 +180,146 @@ std::vector<std::string> find_pg_files() {
     }
     return results;
 }
+
 void splice(std::string infile, std::string donor, std::string outfiles,
             std::string splices, std::string clone, std::string set, bool do_auto,
-            std::string notfiles) {
+            std::string notfiles, std::string suffix) {
     PstFile inPst(infile);
-    PstFile donorPst(donor);
+ 
+    enum splice_source { UNSET, DONOR, SET, CLONE };
+    splice_source source = UNSET;
     
-    map<std::string, vector<std::string> > splice_by_section;
-    for (auto asplice : split_by_commas(splices)) {
-        auto first_underscore = asplice.find('_');
-        string section_name = asplice.substr(0,first_underscore);
-        string line_code = asplice.substr(first_underscore, string::npos);
-        splice_by_section[section_name].emplace_back(line_code);
+    if (donor.length() > 0 ) { source = DONOR; }
+    PstFile donorPst(donor); // This will be blank if there is no donor.
+    
+    if (set.length() > 0) {
+        if (source != UNSET) { throw invalid_argument("Do not use -donor and -set together"); }
+        source = SET;
     }
+    auto all_sets = split_by_commas(set);
+    auto all_sets_count = all_sets.size();
     
-    PstFile outPst;
-    for (auto section : section_vector) {
-        if (splice_by_section.count(section.name)) {
-            cout << "Splicing in section " << section.name << "\n";
+    PstFile clonePst();
+    map<std::string, vector<regex> > clone_by_section;
+    map<std::string, vector<unique_ptr<PstLine> > > clone_PstLines;
+    auto all_clones = split_by_commas(clone);
+    if (clone.length() > 0) {
+        if (source != UNSET) { throw invalid_argument("Do not use -clone with -donor or -set"); }
+        source = CLONE;
+        
+        // Populate the clonePst();
+        // This requires the same code as the main splice loop below.... Hmmm.
+        
+        for (size_t i=0; i<all_clones.size(); i++) {
+            auto aclone = all_clones[i];
+            
+            // Take the splice string and cut it into a section and a linecode.
+            auto first_underscore = aclone.find('_');
+            string section_name = aclone.substr(0,first_underscore);
+            // The line_code may be blank.
+            string line_code = first_underscore == string::npos ? "" : aclone.substr(first_underscore, string::npos);
+            // The clone line_code may not contain _x as a wildcard.
+            // line_code = regex_replace(line_code, regex("_x"), "_\\d+");
+            // Processing the -splice string values into regular expressions to be checked against
+            // every line_code within a section.
+            clone_by_section[section_name].emplace_back(regex(line_code));
+            clone_by_section[section_name].emplace_back(regex(line_code + "_.*"));
         }
-        for (auto && line_pair : inPst.data[section.name]) {
-            bool did_splice_this_line = false;
-            if (splice_by_section.count(section.name)) {
-                for (auto splice_line : splice_by_section[section.name]) {
-                    if (line_pair.second->line_code == splice_line) {
-                        outPst.data[section.name].emplace(line_pair.first, std::make_unique<PstLine>(*donorPst.data[section.name][line_pair.first]));
-                        did_splice_this_line = true;
+        
+    
+        for (auto section : section_vector) {
+            if (clone_by_section.count(section.name)) {
+                for (auto && line_pair : inPst.data[section.name]) {
+                    for (auto clone_line : clone_by_section[section.name]) {
+                        if (regex_match(line_pair.second->line_code, clone_line)) {
+                            clone_PstLines[section.name].emplace_back(std::make_unique<PstLine>(*inPst.data[section.name][line_pair.first]));
+                        }
                     }
                 }
             }
-            if (! did_splice_this_line ) {
-                outPst.data[section.name].emplace(line_pair.first, std::make_unique<PstLine>(*line_pair.second));
-            }
         }
     }
     
-    string outfile = save_dir + "/" + outfiles + "." + pg_suffix;
-    ofstream pg_out(outfile);
-    if (! pg_out.is_open()) throw runtime_error("Failed to write_to " + outfile);
-    cout << "Writing " << outfile << "\n\n";
-    outPst.write_pg(pg_out);
-    unpack(outfile);
+   //  if (source == UNSET) throw invalid_argument("-splice requires exactly one of -donor, -set, or -clone as a source");
     
+        
+    auto all_splices = split_by_commas(splices);
+    auto all_outfiles = split_by_commas(outfiles);
+    auto outfile_count = all_outfiles.size();
+    
+    for (auto oi=0; oi<outfile_count; ++oi) {
+        auto afile = all_outfiles[oi];
+        string outfile = save_dir + "/" + afile + "." + suffix;
+        
+        // If there is just one outfile, apply all splices to it.
+        // If there are multiple outfiles, parcel out the splices, but everyone gets at least one.
+        map<std::string, vector<regex> > splice_by_section;
+        if (all_splices.size()) { // If there are no splices, then this is just a pack.
+            for (auto i=oi % all_splices.size(); i<all_splices.size(); i += outfile_count) {
+                auto asplice = all_splices[i];
+                
+                // Take the splice string and cut it into a section and a linecode.
+                auto first_underscore = asplice.find('_');
+                string section_name = asplice.substr(0,first_underscore);
+                // The line_code may be blank.
+                string line_code = first_underscore == string::npos ? "" : asplice.substr(first_underscore, string::npos);
+                // The line_code may contain _x as a wildcard.
+                line_code = regex_replace(line_code, regex("_x"), "_\\d+");
+                // Processing the -splice string values into regular expressions to be checked against
+                // every line_code within a section.
+                splice_by_section[section_name].emplace_back(regex(line_code));
+                splice_by_section[section_name].emplace_back(regex(line_code + "_.*"));
+            }
+        }
+        size_t set_count = oi;
+        PstFile outPst;
+        for (auto section : section_vector) {
+            for (auto && line_pair : inPst.data[section.name]) {
+                bool did_splice_this_line = false;
+                if (splice_by_section.count(section.name)) {
+                    for (auto splice_line : splice_by_section[section.name]) {
+                        if (regex_match(line_pair.second->line_code, splice_line)) {
+                            switch (source) {
+                                case DONOR:
+                                    // Donor is required to have an exactly matching line_code. Take the line from the donor.
+                                    outPst.data[section.name].emplace(line_pair.first, std::make_unique<PstLine>(*donorPst.data[section.name][line_pair.first]));
+                                    did_splice_this_line = true;
+                                    break;
+                                case SET:
+                                    // Set uses the line_code from inPst, but changes the value.
+                                    outPst.data[section.name].emplace(line_pair.first, std::make_unique<PstLine>(*inPst.data[section.name][line_pair.first]));
+                                    outPst.data[section.name][line_pair.first]->value = all_sets[set_count];
+                                    set_count = (set_count + outfile_count) % all_sets.size();
+                                    did_splice_this_line = true;
+                                    break;
+                                case CLONE:
+                                    // For a clone, clonePst has been assembled and we expect that it will have just the right line to fit.
+                                    outPst.data[section.name].emplace(line_pair.first, std::make_unique<PstLine>(*clone_PstLines[section.name][set_count]));
+                                    //Making sure it fits here.
+                                    if (outPst.data[section.name][line_pair.first]->bytes != inPst.data[section.name][line_pair.first]->bytes ||
+                                        outPst.data[section.name][line_pair.first]->method != inPst.data[section.name][line_pair.first]->method )
+                                        throw invalid_argument("Problem with splice from " + section.name + outPst.data[section.name][line_pair.first]->line_code +
+                                                               " into " + section.name + inPst.data[section.name][line_pair.first]->line_code);
+                                    set_count = (set_count + outfile_count) % clone_PstLines[section.name].size();
+                                    did_splice_this_line = true;
+                                    break;
+                                default: ;
+                                    // Case UNSET : nothing to do here.
+                            }
+                            break;
+                        }
+                    }
+                }
+                if (! did_splice_this_line ) {
+                    outPst.data[section.name].emplace(line_pair.first, std::make_unique<PstLine>(*line_pair.second));
+                }
+            }
+        }
+    
+        ofstream pg_out(outfile);
+        if (! pg_out.is_open()) throw runtime_error("Failed to write_to " + outfile);
+        cout << "Writing " << outfile << "\n\n";
+        outPst.write_pg(pg_out);
+        unpack(outfile);
+    }
 }

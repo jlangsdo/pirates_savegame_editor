@@ -81,6 +81,7 @@ int main(int argc, char **argv)
         }
     }
     
+    //for (auto i=0; i<10;i++) { // Loop for profiling
     if (unpackfiles.size()) {
         auto list = split_by_commas(unpackfiles);
         for (auto afile : list) {
@@ -108,9 +109,11 @@ int main(int argc, char **argv)
     } else if (infile.size() && outfiles.size()) {
         cout << "Setting up to splice\n";
         splice(infile, donorfiles, outfiles, spliceregex, cloneregex, setregex, do_auto, notfiles);
+        
     } else {
         cout << "Unrecognized combination of options.\n";
     }
+    //}
     exit(0);
 }
 
