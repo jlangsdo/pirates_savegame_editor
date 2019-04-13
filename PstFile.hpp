@@ -13,19 +13,35 @@
 #include <string>
 #include <map>
 #include <vector>
+#include <fstream>
+#include <iostream>
 #include "PstSection.hpp"
 #include "PstLine.hpp"
+#include "PiratesFiles.hpp"
 
-void packPst(std::ifstream & in, std::ofstream & out);
 void compare_binary_filestreams(std::ifstream & in1, std::ifstream & in2);
 
 class PstFile {
 public:
+    std::string filename;
     void read_text(std::ifstream & i);
     void write_pg(std::ofstream & i);
+    PstFile() {}
+    PstFile(std::string afile, std::string suffix=pst_suffix) {
+        filename = find_file(afile, suffix);
+        std::ifstream pst_in(filename);
+        if (! pst_in.is_open()) {
+            std::cerr << "Failed to read from " << filename << "\n";
+            exit(1);
+        }
+        std::cout << "Reading " << filename << "\n";
+        read_text(pst_in);
+        pst_in.close();
+    }
 private:
     void remove_features();
     void apply_features();
+    //     Map   of    sections ->  map of sortnum -> PstLine
     std::unordered_map<std::string, std::map<unsigned long long, std::unique_ptr<PstLine> > >  data;
 };
 

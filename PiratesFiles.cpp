@@ -154,27 +154,16 @@ void unpack(std::string afile) {
 
 void testpack(string afile) {  pack(afile, test_suffix); }
 void pack(string afile)     {  pack(afile, pg_suffix); }
-void pack(string afile, string suffix) {
-    string pst_file = find_file(afile, pst_suffix);
-    ifstream pst_in = ifstream(pst_file);
-    if (! pst_in.is_open()) {
-        cerr << "Failed to read from " << pst_file << "\n";
-        exit(1);
-    }
-    cout << "Reading " << pst_file << "\n";
+void pack(string afile, string out_suffix) {
     
-    string pg_file = regex_replace(pst_file, regex(pst_suffix + "$"), suffix);
+    PstFile myPst(afile, pst_suffix);
+    string pg_file = regex_replace(myPst.filename, regex(pst_suffix + "$"), out_suffix);
+    
     ofstream pg_out = ofstream(pg_file);
-    if (! pg_out.is_open()) {
-        cerr << "Failed to write to " << pg_file << "\n";
-        pst_in.close();
-        exit(1);
-    }
+    if (! pg_out.is_open()) throw runtime_error("Failed to write_to " + pg_file);
     cout << "Writing " << pg_file << "\n\n";
     
-    packPst(pst_in, pg_out);
-    pst_in.close();
-    pg_out.close();
+    myPst.write_pg(pg_out);
 }
 
 std::vector<std::string> find_pg_files() {

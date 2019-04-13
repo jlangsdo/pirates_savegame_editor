@@ -36,12 +36,6 @@ void compare_binary_filestreams(std::ifstream & in1, std::ifstream & in2) {
     }
 }
 
-void packPst(std::ifstream & in, std::ofstream & out) {
-    PstFile contents{};
-    contents.read_text(in);
-    contents.write_pg(out);
-}
-
 unsigned long long index_to_sortcode(std::string numbers) {
     // Faster, non-regex version of routine below.
     stringstream digits;
@@ -163,4 +157,5 @@ void PstFile::write_pg(std::ofstream & out) {
             }
         }
     }
+    out.close();
 }

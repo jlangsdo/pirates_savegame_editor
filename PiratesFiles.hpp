@@ -13,6 +13,10 @@
 #include <fstream>
 #include <vector>
 
+extern const std::string pg_suffix;
+extern const std::string pst_suffix;
+extern const std::string test_suffix;
+
 // These are the routines called in main();
 void print_help();
 void print_advanced_help();
@@ -25,6 +29,8 @@ std::vector<std::string> split_by_commas(std::string);
 void comparePg(std::string afile);
 void splice(std::string infile, std::string donor, std::string outfiles,
             std::string splice, std::string clone, std::string set, bool do_auto, std::string notfiles);
+void splice_no_auto(std::string infile, std::string donorfile, std::string outfiles,
+                    std::string splices);
 
 
 // These are used internally.
@@ -32,7 +38,6 @@ void pack(std::string afile, std::string suffix);
 std::string find_file(std::string game, std::string suffix);
 
 void compare_binary_files(std::string file1, std::string file2);
-void test_file_to_test(std::string save_dir, std::string file_to_test);
 std::string find_file(std::string dir, std::string file, std::string suffix);
 
 #endif /* PiratesFiles_hpp */

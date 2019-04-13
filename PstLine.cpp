@@ -851,7 +851,7 @@ void PstLine::read_binary(std::ifstream &in) {
             break;
         case BULK :
             in.read((char*)&b, bytes);
-            // Old method, somewhat slow:
+            // Old method, which was slower:
             // ss << std::noshowbase << std::hex << nouppercase << setfill('0');
             // for (int i=0;i<bytes;i++) {
             //    ss << setw(2) << (int)(unsigned char)b[i];
