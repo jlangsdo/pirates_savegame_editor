@@ -216,7 +216,7 @@ void splice(std::string infile, std::string donor, std::string outfiles,
     auto outfile_count = all_outfiles.size();
     auto all_splices = split_by_commas(splices);
     
-    // Set up source for replacement lines. Only one of these three will be active at a time.
+    // Set up source for replacement lines. Only one of these three will be active at a time (guaranteed by switch testing in main)
     PstFile donorPst(donor);
     auto all_clones  = split_by_commas(clone);
     auto all_sets = split_by_commas(set);
@@ -282,7 +282,7 @@ void splice(std::string infile, std::string donor, std::string outfiles,
                     auto clone_iterator = clonePst.data[section.name].begin();
                     for (auto sortcode : lines_to_splice) {
                         outPst.data[section.name].emplace(sortcode, std::make_unique<PstLine>(*clone_iterator->second));
-                    
+                        
                         //Make sure the replacement line is exactly of the same form as the line it replaced.
                         //This prevents splicing an INT in place of a SHORT.
                         if (outPst.data[section.name][sortcode]->bytes != inPst.data[section.name][sortcode]->bytes ||
@@ -311,5 +311,94 @@ void splice(std::string infile, std::string donor, std::string outfiles,
         cout << "Writing " << outfile << "\n\n";
         outPst.write_pg(pg_out);
         unpack(outfile);
+    }
+}
+
+
+void auto_splice(std::string infile, std::string donorfiles, std::string outfiles, std::string notfiles) {
+    
+    PstFile inPst(infile);
+    auto all_outfiles = split_by_commas(outfiles);
+    auto outfile_count = all_outfiles.size();
+    
+    auto all_donorfiles = split_by_commas(donorfiles);
+    vector <std::unique_ptr<PstFile> > donorPst;
+    for (auto afile : all_donorfiles) { donorPst.emplace_back(make_unique<PstFile>(afile)); }
+    auto & oneDonor = donorPst.back();
+    //donorPst.pop_back();
+    
+    auto all_notfiles = split_by_commas(notfiles);
+    vector <std::unique_ptr<PstFile> > notPst;
+    for (auto afile : all_notfiles) { notPst.emplace_back(make_unique<PstFile>(afile)); }
+    
+    // An auto-splice line comes from something observed in the donor files which is not in inPst or the notPst.
+    //   - in the oneDonor, same value in other donors, different/missing in inPst and notPst
+    //   - in inPst, not in any donors, same in notPst as in inPst.
+    //
+    map <std::string, vector<unsigned long long> >   splice_targets;
+    for (auto section : section_vector) {
+        for (auto && line_pair : oneDonor->data[section.name]) {
+            bool splice_it = true;
+
+            auto sortcode = line_pair.first;
+            auto value = line_pair.second->value;
+
+            if (inPst.data[section.name].count(sortcode) != 0  &&
+                inPst.data[section.name][sortcode]->value == value) {
+                // same value in the in inPst as in the oneDonor.
+                splice_it = false;
+            }
+
+            for (auto && otherDonor : donorPst) {
+                if (otherDonor->data[section.name].count(sortcode) == 0) {
+                    // Not in one of the other donors;
+                    splice_it = false;
+                }
+                if (otherDonor->data[section.name][sortcode]->value != value) {
+                    // different value in one of the other donors.
+                    splice_it = false;
+                }
+            }
+            for (auto && otherNot : notPst) {
+                if (otherNot->data[section.name].count(sortcode) != 0 &&
+                    otherNot->data[section.name][sortcode]->value == value) {
+                    // Same value in this not file as in the oneDonor
+                    splice_it = false;
+                }
+            }
+            if (splice_it) {
+                splice_targets[section.name].push_back(sortcode);
+            }
+        }
+        for (auto && line_pair : inPst.data[section.name]) {
+            bool splice_it = true;
+
+            auto sortcode = line_pair.first;
+            auto value = line_pair.second->value;
+
+            if (oneDonor->data[section.name].count(sortcode) != 0) {
+                // existed in oneDonor. If we wanted to splice it, we would have by now.
+                splice_it = false;
+            }
+            for (auto && otherDonor : donorPst) {
+                if (otherDonor->data[section.name].count(sortcode) != 0) {
+                    // existed in one of the other donors.
+                    splice_it = false;
+                }
+            }
+            for (auto && otherNot : notPst) {
+                if (otherNot->data[section.name].count(sortcode) == 0 ||
+                    otherNot->data[section.name][sortcode]->value != value) {
+                    // notPst didn't match inPst.
+                    splice_it = false;
+                }
+            }
+            if (splice_it) {
+                splice_targets[section.name].push_back(sortcode);
+            }
+        }
+        if (splice_targets[section.name].size() > 0) {
+            cout << "Found " << splice_targets[section.name].size() << " lines to splice in " << section.name << "\n";
+        }
     }
 }

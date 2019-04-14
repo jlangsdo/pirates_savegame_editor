@@ -4,17 +4,27 @@
 <dict>
 	<key>SchemeUserState</key>
 	<dict>
-		<key>clone.xcscheme</key>
+		<key>auto.xcscheme</key>
 		<dict>
 			<key>orderHint</key>
 			<integer>4</integer>
 		</dict>
+		<key>clone.xcscheme</key>
+		<dict>
+			<key>orderHint</key>
+			<integer>6</integer>
+		</dict>
 		<key>clone2.xcscheme</key>
+		<dict>
+			<key>orderHint</key>
+			<integer>7</integer>
+		</dict>
+		<key>set.xcscheme</key>
 		<dict>
 			<key>orderHint</key>
 			<integer>5</integer>
 		</dict>
-		<key>set.xcscheme</key>
+		<key>splice feature from donor.xcscheme</key>
 		<dict>
 			<key>orderHint</key>
 			<integer>3</integer>
