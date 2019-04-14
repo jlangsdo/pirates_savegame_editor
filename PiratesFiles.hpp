@@ -33,6 +33,10 @@ void splice_no_auto(std::string infile, std::string donorfile, std::string outfi
                     std::string splices);
 
 
+void splice_donor(std::string infile, std::string donor, std::string outfiles, std::string splices);
+void splice_clone(std::string infile, std::string clone, std::string outfiles, std::string splices);
+void splice_clone(std::string infile, std::string   set, std::string outfiles, std::string splices);
+
 // These are used internally.
 void pack(std::string afile, std::string suffix);
 std::string find_file(std::string game, std::string suffix);

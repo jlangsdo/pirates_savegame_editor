@@ -20,6 +20,7 @@
 #include "PiratesFiles.hpp"
 
 void compare_binary_filestreams(std::ifstream & in1, std::ifstream & in2);
+unsigned long long index_to_sortcode(std::string numbers);
 
 class PstFile {
 public:
