@@ -106,10 +106,14 @@ int main(int argc, char **argv)
             testpack(afile);
             comparePg(afile);
         }
-    } else if (infile.size() && outfiles.size()) {
+    } else if (infile != "" && outfiles != "" && spliceregex != "") {
+        if (donorfiles != "" && setregex != "")   throw invalid_argument("Do not use -donor and -set together");
+        if (donorfiles != "" && cloneregex != "") throw invalid_argument("Do not use -donor and -clone together");
+        if (cloneregex != "" && setregex != "")   throw invalid_argument("Do not use -clone and -set together");
+        if (donorfiles.find(",")!=string::npos) throw invalid_argument("Do not use -splice with multiple -donor files");
+        
         cout << "Setting up to splice\n";
         splice(infile, donorfiles, outfiles, spliceregex, cloneregex, setregex, do_auto, notfiles);
-        
     } else {
         cout << "Unrecognized combination of options.\n";
     }
