@@ -18,7 +18,6 @@
 #include <vector>
 using namespace std;
 
-
 void compare_binary_filestreams(std::ifstream & in1, std::ifstream & in2) {
     constexpr int c = 16;  // This is like diff, but avoiding the unix system call to be portable with Windows.
     char b1[c];
@@ -36,7 +35,7 @@ void compare_binary_filestreams(std::ifstream & in1, std::ifstream & in2) {
     }
 }
 
-unsigned long long index_to_sortcode(std::string numbers) {
+Sortcode index_to_sortcode(std::string numbers) {
     // Faster, non-regex version of routine below.
     stringstream digits;
     digits << "1";
@@ -59,7 +58,7 @@ unsigned long long index_to_sortcode(std::string numbers) {
 }
 
 
-unsigned long long slow_index_to_sortcode(std::string numbers) {
+Sortcode slow_index_to_sortcode(std::string numbers) {
     // Convert a number code like _23_5_2 into a giant long integer like: 1'023'005'002'000'000'000
     // so in the PstFile map they will sort them into place.
     // Note that it would be illegal to have lines_codes like Ship_23 and Ship_23_0 as they would sort together.
@@ -79,7 +78,7 @@ unsigned long long slow_index_to_sortcode(std::string numbers) {
     }
     return stoull(digits.str());
 }
-int sortcode_get_index(unsigned long long sortcode, const int index) {
+int sortcode_get_index(Sortcode sortcode, const int index) {
     for (auto b=index; b<6; b++) {
         sortcode /= 1000;
     }
@@ -155,7 +154,7 @@ void PstFile::read_text(std::ifstream & in) {
         string value     = special_fast_regex_result(line, r, 10);
         
         // Convert the line_code numbers into a big integer for quick sorting.
-        unsigned long long sortcode = index_to_sortcode(line_code);
+        Sortcode sortcode = index_to_sortcode(line_code);
         
         data[section].emplace(sortcode, std::make_unique<PstLine>(line_code, method, bytes, value) );
     }
@@ -182,7 +181,7 @@ void PstFile::write_pg(std::ofstream & out) {
                         // 293 is a magic number: the width of a map.
                         // For a Feature at FeatureMap_35_202,
                         // we need to edit FeatureMap_35_293 column 202, so construct the appropriate line_code, and edit that PstLine.
-                        unsigned long long target = index_to_sortcode("_" + to_string(row) + "_293");
+                        Sortcode target = index_to_sortcode("_" + to_string(row) + "_293");
                         if (data[section.name].count(target) != 1) throw logic_error ("Tried to add features to missing row");
                         data[section.name].at(target)->update_map_value(col, pair.second->value);
                     }

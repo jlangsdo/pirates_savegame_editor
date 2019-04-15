@@ -279,6 +279,7 @@
 		153F2B9E224EC78E00CCA927 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_CXX_LANGUAGE_STANDARD = "c++17";
 				CODE_SIGN_STYLE = Automatic;
 				"HEADER_SEARCH_PATHS[arch=*]" = /usr/local/boost_1_69_0/include/;
 				"LIBRARY_SEARCH_PATHS[arch=*]" = /usr/local/boost_1_69_0/lib/;
@@ -295,6 +296,7 @@
 		153F2B9F224EC78E00CCA927 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_CXX_LANGUAGE_STANDARD = "c++17";
 				CODE_SIGN_STYLE = Automatic;
 				OTHER_LDFLAGS = (
 					"-l",

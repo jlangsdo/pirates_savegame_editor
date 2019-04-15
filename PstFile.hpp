@@ -19,8 +19,10 @@
 #include "PstLine.hpp"
 #include "PiratesFiles.hpp"
 
+using Sortcode = unsigned long long;
+
 void compare_binary_filestreams(std::ifstream & in1, std::ifstream & in2);
-unsigned long long index_to_sortcode(std::string numbers);
+Sortcode index_to_sortcode(std::string numbers);
 
 class PstFile {
 public:
@@ -42,7 +44,15 @@ public:
         }
     }
     //     Map   of    sections ->  map of sortnum -> PstLine
-    std::unordered_map<std::string, std::map<unsigned long long, std::unique_ptr<PstLine> > >  data;
+    std::unordered_map<std::string, std::map<Sortcode, std::unique_ptr<PstLine> > >  data;
+    
+    // Syntactic Sugar
+    std::map<Sortcode, std::unique_ptr<PstLine> > & operator[](PstSection section){ return data[section.name]; }
+    bool matches(PstSection section, Sortcode sortcode, std::string value) {
+        return data[section.name].count(sortcode) != 0  &&
+        data[section.name][sortcode]->value == value;
+    }
+    
 private:
     void remove_features();
     void apply_features();

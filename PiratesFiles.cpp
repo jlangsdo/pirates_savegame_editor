@@ -237,33 +237,31 @@ void splice(std::string infile, std::string donor, std::string outfiles,
         // (noting their sortcodes) but duplicate the rest to outPst.
         PstFile outPst;
         for (auto section : section_vector) {
-            vector<unsigned long long> lines_to_splice;
-            for (auto && line_pair : inPst.data[section.name]) {
+            vector<Sortcode> lines_to_splice;
+            for (auto && [sortcode, aPstLine] : inPst[section]) {
                 bool did_splice_this_line = false;
                 if (splice_by_section.count(section.name)) {
                     for (auto splice_line : splice_by_section[section.name]) {
-                        if (regex_match(line_pair.second->line_code, splice_line)) {
-                            lines_to_splice.push_back(line_pair.first);
+                        if (regex_match(aPstLine->line_code, splice_line)) {
+                            lines_to_splice.push_back(sortcode);
                             did_splice_this_line = true;
                             break;
                         }
                     }
                 }
                 if (! did_splice_this_line ) {
-                    outPst.data[section.name].emplace(line_pair.first, std::make_unique<PstLine>(*line_pair.second));
+                    outPst[section].emplace(sortcode, std::make_unique<PstLine>(*aPstLine));
                 }
             }
             
             // Now, add in replacement lines from the desired source:
             if (splice_by_section.count(section.name)) {
                 if (donor != "") {
-                    // The old implementation expected the donor to have exactly the same lines. The problem with that
-                    // is it means FEATURE lines cannot be mapped in, as they do not have matching sortcodes.
-                    // Instead, just parse the donorPst and add in any lines that match the splice.
-                    for (auto && line_pair : donorPst.data[section.name]) {
+                    // parse the donorPst and add in any lines that match the splice.
+                    for (auto && [sortcode, aPstLine] : donorPst[section]) {
                         for (auto splice_line : splice_by_section[section.name]) {
-                            if (regex_match(line_pair.second->line_code, splice_line)) {
-                                outPst.data[section.name].emplace(line_pair.first, std::make_unique<PstLine>(*donorPst.data[section.name][line_pair.first]));
+                            if (regex_match(aPstLine->line_code, splice_line)) {
+                                outPst[section].emplace(sortcode, std::make_unique<PstLine>(*aPstLine));
                                 break;
                             }
                         }
@@ -271,27 +269,27 @@ void splice(std::string infile, std::string donor, std::string outfiles,
                 } else if (clone != ""){
                     
                     PstFile clonePst;  // This PstFile is just one section's worth of cloned lines.
-                    for (auto && line_pair : inPst.data[section.name]) {
+                    for (auto && [sortcode, aPstLine] : inPst[section]) {
                         for (auto clone_line : clone_by_section[section.name]) {
-                            if (regex_match(line_pair.second->line_code, clone_line)) {
-                                clonePst.data[section.name].emplace(line_pair.first, std::make_unique<PstLine>(*inPst.data[section.name][line_pair.first]));
+                            if (regex_match(aPstLine->line_code, clone_line)) {
+                                clonePst[section].emplace(sortcode, std::make_unique<PstLine>(*aPstLine));
                             }
                         }
                     }
                     
-                    auto clone_iterator = clonePst.data[section.name].begin();
+                    auto clone_iterator = clonePst[section].begin();
                     for (auto sortcode : lines_to_splice) {
-                        outPst.data[section.name].emplace(sortcode, std::make_unique<PstLine>(*clone_iterator->second));
+                        outPst[section].emplace(sortcode, std::make_unique<PstLine>(*clone_iterator->second));
                         
                         //Make sure the replacement line is exactly of the same form as the line it replaced.
                         //This prevents splicing an INT in place of a SHORT.
-                        if (outPst.data[section.name][sortcode]->bytes != inPst.data[section.name][sortcode]->bytes ||
-                            outPst.data[section.name][sortcode]->method != inPst.data[section.name][sortcode]->method )
-                            throw invalid_argument("Problem with splice from " + section.name + outPst.data[section.name][sortcode]->line_code +
-                                                   " into " + section.name + inPst.data[section.name][sortcode]->line_code);
+                        if (outPst[section][sortcode]->bytes != inPst[section][sortcode]->bytes ||
+                            outPst[section][sortcode]->method != inPst[section][sortcode]->method )
+                            throw invalid_argument("Problem with splice from " + section.name + outPst[section][sortcode]->line_code +
+                                                   " into " + section.name + inPst[section][sortcode]->line_code);
                         ++clone_iterator;
-                        if (clone_iterator == clonePst.data[section.name].end()) {
-                            clone_iterator = clonePst.data[section.name].begin();
+                        if (clone_iterator == clonePst[section].end()) {
+                            clone_iterator = clonePst[section].begin();
                         }
                     }
                 } else if (set != "") {
@@ -299,8 +297,8 @@ void splice(std::string infile, std::string donor, std::string outfiles,
                     // There is no type-checking on the value because that seems hard.
                     size_t set_count = oi;
                     for (auto sortcode : lines_to_splice) {
-                        outPst.data[section.name].emplace(sortcode, std::make_unique<PstLine>(*inPst.data[section.name][sortcode]));
-                        outPst.data[section.name][sortcode]->value = all_sets[set_count];
+                        outPst[section].emplace(sortcode, std::make_unique<PstLine>(*inPst[section][sortcode]));
+                        outPst[section][sortcode]->value = all_sets[set_count];
                         set_count = (set_count + outfile_count) % all_sets.size();
                     }
                 }
@@ -335,63 +333,33 @@ void auto_splice(std::string infile, std::string donorfiles, std::string outfile
     //   - in the oneDonor, same value in other donors, different/missing in inPst and notPst
     //   - in inPst, not in any donors, same in notPst as in inPst.
     //
-    map <std::string, vector<unsigned long long> >   splice_targets;
+    map <std::string, vector<Sortcode> >   splice_targets;
     for (auto section : section_vector) {
-        for (auto && line_pair : oneDonor->data[section.name]) {
+        for (auto && [sortcode, aPstLine] : (*oneDonor)[section]) {
             bool splice_it = true;
+            auto value = aPstLine->value;
 
-            auto sortcode = line_pair.first;
-            auto value = line_pair.second->value;
-
-            if (inPst.data[section.name].count(sortcode) != 0  &&
-                inPst.data[section.name][sortcode]->value == value) {
-                // same value in the in inPst as in the oneDonor.
-                splice_it = false;
-            }
-
+            if (inPst.matches(section,sortcode,value)) { splice_it = false; }
             for (auto && otherDonor : donorPst) {
-                if (otherDonor->data[section.name].count(sortcode) == 0) {
-                    // Not in one of the other donors;
-                    splice_it = false;
-                }
-                if (otherDonor->data[section.name][sortcode]->value != value) {
-                    // different value in one of the other donors.
-                    splice_it = false;
-                }
+                if (! (*otherDonor).matches(section,sortcode,value)) { splice_it = false; }
             }
             for (auto && otherNot : notPst) {
-                if (otherNot->data[section.name].count(sortcode) != 0 &&
-                    otherNot->data[section.name][sortcode]->value == value) {
-                    // Same value in this not file as in the oneDonor
-                    splice_it = false;
-                }
+                if ((*otherNot).matches(section,sortcode,value)) { splice_it = false; }
             }
             if (splice_it) {
                 splice_targets[section.name].push_back(sortcode);
             }
         }
-        for (auto && line_pair : inPst.data[section.name]) {
+        for (auto && [sortcode, aPstLine] : inPst[section]) {
             bool splice_it = true;
+            auto value = aPstLine->value;
 
-            auto sortcode = line_pair.first;
-            auto value = line_pair.second->value;
-
-            if (oneDonor->data[section.name].count(sortcode) != 0) {
-                // existed in oneDonor. If we wanted to splice it, we would have by now.
-                splice_it = false;
-            }
+            if ((*oneDonor)[section].count(sortcode) != 0) { splice_it = false; }
             for (auto && otherDonor : donorPst) {
-                if (otherDonor->data[section.name].count(sortcode) != 0) {
-                    // existed in one of the other donors.
-                    splice_it = false;
-                }
+                if ((*otherDonor)[section].count(sortcode) != 0) { splice_it = false; }
             }
             for (auto && otherNot : notPst) {
-                if (otherNot->data[section.name].count(sortcode) == 0 ||
-                    otherNot->data[section.name][sortcode]->value != value) {
-                    // notPst didn't match inPst.
-                    splice_it = false;
-                }
+                if (! (*otherNot).matches(section,sortcode,value)) { splice_it = false; }
             }
             if (splice_it) {
                 splice_targets[section.name].push_back(sortcode);
