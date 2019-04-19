@@ -129,7 +129,7 @@ string find_file(string game, string suffix) {
     exit(1);
 }
 
-void unpack(std::string afile) {
+void unpack(std::string afile, std::string extra_text) {
     string pg_file = find_file(afile, pg_suffix);
     ifstream pg_in = ifstream(pg_file, ios::binary);
     if (! pg_in.is_open()) {
@@ -147,7 +147,8 @@ void unpack(std::string afile) {
     }
     cout << "Writing " << pst_file << "\n\n";
     
-    unpackPst(pg_in, pst_out);
+    unpackPst(pg_in, pst_out); // BUG: Doesn't check that the file is eof
+    pst_out << extra_text;
     pg_in.close();
     pst_out.close();
 }
@@ -331,14 +332,16 @@ void auto_splice(std::string infile, std::string donorfiles, std::string outfile
     
     // An auto-splice line comes from something observed in the donor files which is not in inPst or the notPst.
     //   - in the oneDonor, same value in other donors, different/missing in inPst and notPst
-    //   - in inPst, not in any donors, same in notPst as in inPst.
+    //   - in inPst, not in any donors, same in notPst as in inPst - but for backward compatibility, these ARE NOT COUNTED.
     //
-    map <std::string, vector<Sortcode> >   splice_targets;
+    map <std::string, set<Sortcode> >   splice_targets;
+    vector<std::string> splice_lines;
+    int splice_count = 0;
     for (auto section : section_vector) {
         for (auto && [sortcode, aPstLine] : (*oneDonor)[section]) {
             bool splice_it = true;
             auto value = aPstLine->value;
-
+            
             if (inPst.matches(section,sortcode,value)) { splice_it = false; }
             for (auto && otherDonor : donorPst) {
                 if (! (*otherDonor).matches(section,sortcode,value)) { splice_it = false; }
@@ -347,26 +350,85 @@ void auto_splice(std::string infile, std::string donorfiles, std::string outfile
                 if ((*otherNot).matches(section,sortcode,value)) { splice_it = false; }
             }
             if (splice_it) {
-                splice_targets[section.name].push_back(sortcode);
-            }
-        }
-        for (auto && [sortcode, aPstLine] : inPst[section]) {
-            bool splice_it = true;
-            auto value = aPstLine->value;
-
-            if ((*oneDonor)[section].count(sortcode) != 0) { splice_it = false; }
-            for (auto && otherDonor : donorPst) {
-                if ((*otherDonor)[section].count(sortcode) != 0) { splice_it = false; }
-            }
-            for (auto && otherNot : notPst) {
-                if (! (*otherNot).matches(section,sortcode,value)) { splice_it = false; }
-            }
-            if (splice_it) {
-                splice_targets[section.name].push_back(sortcode);
+                splice_count++;
+                splice_targets[section.name].insert(sortcode);
+                splice_lines.emplace_back(section.name + aPstLine->line_code);
             }
         }
         if (splice_targets[section.name].size() > 0) {
             cout << "Found " << splice_targets[section.name].size() << " lines to splice in " << section.name << "\n";
         }
+    }
+    sort(splice_lines.begin(), splice_lines.end());
+    cout << "Found " << splice_count << " lines to splice total.\n";
+    for (auto aline : splice_lines) {
+        cout << "AUTO_SPLICE " << aline << "\n";
+    }
+    
+    
+    // Now for the splice. We can splice just from the oneDonor (because all splice lines are the same
+    // in all donors. Also, no need for regex, we have exact sortcodes / linecodes.
+    for (auto oi=0; oi<outfile_count; ++oi) {
+        auto afile = all_outfiles[oi];
+        string outfile = save_dir + "/" + afile + "." + pg_suffix;
+        
+        enum auto_mode {ALL, ONE, HALF};
+        auto_mode mode;
+        if (outfile_count == 1) {
+            // If we have only one outfile, then all splices go to that outfile.
+            mode = ALL;
+        } else if (outfile_count > splice_count) {
+            // If we have very few candidate lines, put one in each outfile, but put them all in the first outfile.
+            if (oi==0) mode = ALL;
+            else mode = ONE;
+        } else {
+            // If we have many splice lines, split them up between the outfiles to enable a binary search.
+            mode = HALF;
+        }
+        
+        
+        PstFile outPst;
+        
+        // Weird sort order inherited from perl version.
+        int flip = pow(2, oi);
+        bool include = true;
+        map<std::string, set <std::string > > splice_sub_lines;
+        for (int i=0; i<splice_lines.size(); ++i) {
+            if (mode==ALL || (mode==ONE && oi==i+1) || (mode==HALF && include) ) {
+                size_t underscore = splice_lines[i].find("_",0);
+                string asection = splice_lines[i].substr(0,underscore);
+                string alinecode = splice_lines[i].substr(underscore, string::npos);
+                splice_sub_lines[asection].emplace(alinecode);
+            }
+            if ((i+1) % flip == 0) { include = !include; }
+        }
+        
+        
+        for (auto section : section_vector) {
+            for (auto && [sortcode, aPstLine] : (inPst)[section]) {
+                if (splice_sub_lines.count(section.name) &&
+                    splice_sub_lines[section.name].count(aPstLine->line_code)) {
+                    // All splices must exist in the donor (see above)
+                    outPst[section].emplace(sortcode, std::make_unique<PstLine>(*(*oneDonor)[section][sortcode]));
+                } else {
+                    outPst[section].emplace(sortcode, std::make_unique<PstLine>(*inPst[section][sortcode]));
+                }
+            }
+            // Also consider splice_targets that exist in oneDonor but not inPst.
+            for (auto && [sortcode, aPstLine] : (*oneDonor)[section]) {
+                if ( splice_targets.count(section.name) ) {
+                    if (splice_sub_lines.count(section.name) &&
+                        splice_sub_lines[section.name].count(aPstLine->line_code) &&
+                        ! inPst[section].count(sortcode) ) {
+                        outPst[section].emplace(sortcode, std::make_unique<PstLine>(*(*oneDonor)[section][sortcode]));
+                    }
+                }
+            }
+        }
+        ofstream pg_out(outfile);
+        if (! pg_out.is_open()) throw runtime_error("Failed to write_to " + outfile);
+        cout << "Writing " << outfile << "\n\n";
+        outPst.write_pg(pg_out);
+        unpack(outfile, "## Auto Spliced\n");
     }
 }

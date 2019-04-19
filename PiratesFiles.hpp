@@ -21,7 +21,7 @@ extern const std::string test_suffix;
 void print_help();
 void print_advanced_help();
 void set_up_decoding();
-void unpack(std::string afile);
+void unpack(std::string afile, std::string extra_text="");
 void pack(std::string afile);
 void testpack(std::string afile);
 std::vector<std::string> find_pg_files();
