@@ -67,8 +67,59 @@ vector<std::string> split_by_commas(std::string arg) {
 void print_advanced_help() {
     const string advanced_help_message = R"AUSAGE(
     
+    For manual splicing:
+    -in <file> -out <files> -splice <regex>
+    plus one of these: -set <value>, -clone <regex>, or -donor <file>
     
+    The splicing operation loads in a pst file, changes some of the lines
+    according to the switches, writes out an edited pirates_savegame file,
+    then unpacks that file.
     
+    The -splice target is a line_code, like Log_4_3.
+    If you leave off part of the line_code, it will add all extensions,
+    so -splice Ship_0 will splice all of the lines that start with Ship_0_.
+    You can also use _x to as a wildcard number. T
+    hese switches can take multiple comma separated arguments,
+    so you can splice multiple groups of lines at a time.
+    
+    -clone takes the same style of regex as -splice.
+        Use this to clone one Ship to another, or one CityInfo to another.
+    -set lets you just set values. Be careful to make sure you put in a legal value.
+    -donor says to look in the donor file for the identical line_codes there.
+    
+    If there are multiple comma separated -out files, then it splits up the splices
+    to parcel them out to the different output files.
+    It also splits up the -clone, -set, and -donor appropriately.
+    
+    For automatic splicing:
+    -auto -in <file> -out <files> -donor <files> [-not <files>]
+    
+    This is designed to help you find which line_code corresponds to a feature
+    which appears in the donor file(s) but not in the -in file
+    (and also not in any of the -not files, if applicable).
+    It finds all line_codes which could correspond to such a feature.
+    If there is one output file, all candidate lines go there.
+    If there are more output files than candidate lines,
+        it puts all of the splices into the first output file,
+        and then one into each of the others.
+    If there are more splice candidates, then it sets up a binary search,
+        by putting half of the splices into each output file,
+        in such a way that testing each output file will have minimal redundancy.
+    After checking which of those files have the feature,
+    they can be fed back in using -donor and -not for another round
+    to quickly narrow down the target line_code.
+    
+    For regression:
+    -test <files>
+        
+    Unpacks the file, then repacks it, and then compares the resulting
+    pirates_savegame file to the original. Detects cases where information has
+    been lost in the unpack/pack combination.
+        
+    -sweep
+        
+    Runs -test on all available files in the directory given.
+        
     )AUSAGE";
     cout << advanced_help_message;
     exit(0);
