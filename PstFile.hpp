@@ -15,6 +15,7 @@
 #include <vector>
 #include <fstream>
 #include <iostream>
+#include <regex>
 #include "PstSection.hpp"
 #include "PstLine.hpp"
 #include "PiratesFiles.hpp"
@@ -38,7 +39,8 @@ public:
                 std::cerr << "Failed to read from " << filename << "\n";
                 exit(1);
             }
-            std::cout << "Reading " << filename << "\n";
+            std::string short_file = regex_replace(filename, std::regex(".*\\/"), "");
+            std::cout << "Reading " << short_file << "\n";
             read_text(pst_in);
             pst_in.close();
         }

@@ -117,11 +117,8 @@ int main(int argc, char **argv)
         if (donorfiles != "" && setregex != "")   throw invalid_argument("Do not use -donor and -set together");
         if (donorfiles != "" && cloneregex != "") throw invalid_argument("Do not use -donor and -clone together");
         if (cloneregex != "" && setregex != "")   throw invalid_argument("Do not use -clone and -set together");
-        
-        cout << "Setting up to splice\n";
         splice(infile, donorfiles, outfiles, spliceregex, cloneregex, setregex, do_auto, notfiles);
     } else if (infile != "" && outfiles != "" && donorfiles !="" && do_auto) {
-        cout << "Setting up auto-splice\n";
         auto_splice(infile, donorfiles, outfiles, notfiles);
     } else {
         cout << "Unrecognized combination of options.\n";

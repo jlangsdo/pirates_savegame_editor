@@ -287,10 +287,6 @@ int temp_i;
 string translate_event(const PstLine & i) {
     auto as_two = make_pair(i.v/16, i.v%16);
     int index = suffix_from_linecode(i.line_code);
-    if (i.line_code == "Log_43_8") {
-        // debug here.
-        
-    }
     switch (index) {
         case 0:
             stored_event = i.v;

@@ -67,7 +67,6 @@ vector<std::string> split_by_commas(std::string arg) {
 void print_advanced_help() {
     const string advanced_help_message = R"AUSAGE(
     
-    The advanced switches have not been implemented yet.
     
     
     )AUSAGE";
@@ -97,7 +96,9 @@ void comparePg(std::string afile) {
         cerr << "Failed to read from " << file2 << "\n";
         exit(1);
     }
-    cout << "Comparing " << file1 << " to " << file2 << "\n";
+    string short_file1 = regex_replace(file1, regex(".*\\/"), "");
+    string short_file2 = regex_replace(file2, regex(".*\\/"), "");
+    cout << "Comparing " << short_file1 << " to " << short_file2 << "\n";
     compare_binary_filestreams(fs1,fs2); // Aborts on failure.
     fs1.close();
     fs2.close();
@@ -136,8 +137,8 @@ void unpack(std::string afile, std::string extra_text) {
         cerr << "Failed to read from " << pg_file << "\n";
         exit(1);
     }
-    cout << "Unpacking " << pg_file << "\n";
-    
+    string short_file = regex_replace(pg_file, regex(".*\\/"), "");
+    cout << "Translated " << short_file;
     string pst_file = regex_replace(pg_file, regex(pg_suffix + "$"), pst_suffix);
     ofstream pst_out = ofstream(pst_file);
     if (! pst_out.is_open()) {
@@ -145,12 +146,14 @@ void unpack(std::string afile, std::string extra_text) {
         pg_in.close();
         exit(1);
     }
-    cout << "Writing " << pst_file << "\n\n";
     
     unpackPst(pg_in, pst_out); // BUG: Doesn't check that the file is eof
     pst_out << extra_text;
     pg_in.close();
     pst_out.close();
+    
+    short_file = regex_replace(pst_file, regex(".*\\/"), "");
+    cout << " -> " << short_file << "\n";
 }
 
 void testpack(string afile) {  pack(afile, test_suffix); }
@@ -158,10 +161,10 @@ void pack(string afile)     {  pack(afile, pg_suffix); }
 void pack(string afile, string out_suffix) {
     PstFile myPst(afile, pst_suffix);
     string pg_file = regex_replace(myPst.filename, regex(pst_suffix + "$"), out_suffix);
-    
+    string short_file = regex_replace(pg_file, regex(".*\\/"), "");
     ofstream pg_out = ofstream(pg_file);
     if (! pg_out.is_open()) throw runtime_error("Failed to write_to " + pg_file);
-    cout << "Writing " << pg_file << "\n\n";
+    cout << "Writing " << short_file << "\n";
     
     myPst.write_pg(pg_out);
 }
@@ -307,7 +310,8 @@ void splice(std::string infile, std::string donor, std::string outfiles,
         }
         ofstream pg_out(outfile);
         if (! pg_out.is_open()) throw runtime_error("Failed to write_to " + outfile);
-        cout << "Writing " << outfile << "\n\n";
+        string short_file = regex_replace(outfile, regex(".*\\/"), "");
+        cout << "Writing " << short_file << "\n";
         outPst.write_pg(pg_out);
         unpack(outfile);
     }
@@ -348,6 +352,11 @@ void auto_splice(std::string infile, std::string donorfiles, std::string outfile
             }
             for (auto && otherNot : notPst) {
                 if ((*otherNot).matches(section,sortcode,value)) { splice_it = false; }
+                // backward compatibility: inPst must match the -not files for any line that will be spliced.
+                if ((*otherNot)[section].count(sortcode) && inPst[section].count(sortcode)) {
+                    string inVal = inPst[section][sortcode]->value;
+                    if (! (*otherNot).matches(section,sortcode,inVal)) { splice_it = false; }
+                }
             }
             if (splice_it) {
                 splice_count++;
@@ -355,16 +364,9 @@ void auto_splice(std::string infile, std::string donorfiles, std::string outfile
                 splice_lines.emplace_back(section.name + aPstLine->line_code);
             }
         }
-        if (splice_targets[section.name].size() > 0) {
-            cout << "Found " << splice_targets[section.name].size() << " lines to splice in " << section.name << "\n";
-        }
     }
+    cout << "Total of " << splice_lines.size() << " candidate lines for auto-splicing\n";
     sort(splice_lines.begin(), splice_lines.end());
-    cout << "Found " << splice_count << " lines to splice total.\n";
-    for (auto aline : splice_lines) {
-        cout << "AUTO_SPLICE " << aline << "\n";
-    }
-    
     
     // Now for the splice. We can splice just from the oneDonor (because all splice lines are the same
     // in all donors. Also, no need for regex, we have exact sortcodes / linecodes.
@@ -381,9 +383,19 @@ void auto_splice(std::string infile, std::string donorfiles, std::string outfile
             // If we have very few candidate lines, put one in each outfile, but put them all in the first outfile.
             if (oi==0) mode = ALL;
             else mode = ONE;
+            if (oi > splice_count) { break; }
         } else {
             // If we have many splice lines, split them up between the outfiles to enable a binary search.
             mode = HALF;
+        }
+        
+        if (mode == ALL) {
+            cout << "All lines test: " << afile << " <=";
+            for (auto aline : splice_lines) { cout << aline << " "; }
+            cout << "\n";
+        }
+        if (mode == ONE) {
+            cout << "Single line test: " << afile << " <= " << splice_lines[oi-1] << "\n";
         }
         
         
@@ -392,6 +404,7 @@ void auto_splice(std::string infile, std::string donorfiles, std::string outfile
         // Weird sort order inherited from perl version.
         int flip = pow(2, oi);
         bool include = true;
+        int this_splice_count = 0;
         map<std::string, set <std::string > > splice_sub_lines;
         for (int i=0; i<splice_lines.size(); ++i) {
             if (mode==ALL || (mode==ONE && oi==i+1) || (mode==HALF && include) ) {
@@ -399,10 +412,11 @@ void auto_splice(std::string infile, std::string donorfiles, std::string outfile
                 string asection = splice_lines[i].substr(0,underscore);
                 string alinecode = splice_lines[i].substr(underscore, string::npos);
                 splice_sub_lines[asection].emplace(alinecode);
+                this_splice_count++;
             }
             if ((i+1) % flip == 0) { include = !include; }
         }
-        
+        cout << "auto-splicing " << this_splice_count << " lines\n";
         
         for (auto section : section_vector) {
             for (auto && [sortcode, aPstLine] : (inPst)[section]) {
@@ -427,7 +441,8 @@ void auto_splice(std::string infile, std::string donorfiles, std::string outfile
         }
         ofstream pg_out(outfile);
         if (! pg_out.is_open()) throw runtime_error("Failed to write_to " + outfile);
-        cout << "Writing " << outfile << "\n\n";
+        string short_file = regex_replace(outfile, regex(".*\\/"), "");
+        cout << "Writing " << short_file << "\n";
         outPst.write_pg(pg_out);
         unpack(outfile, "## Auto Spliced\n");
     }
