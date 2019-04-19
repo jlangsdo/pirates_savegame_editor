@@ -14,6 +14,7 @@
 #include <string>
 #include "RMeth.hpp"
 #include "PstSection.hpp"
+#include <array>
 
 class PstLine {
 public:
@@ -22,11 +23,17 @@ public:
     std::string value;
     rmeth method;
     int bytes = standard_rmeth_size.at(method);
-    std::list<std::string> lca = {};   // line_code_aliases
+    std::array<std::string, 3> lca;   // line_code_aliases
     
     PstLine(std::string lc, rmeth rm, int v, std::string value, std::string al) :
-        line_code(lc), method(rm), v(v), value(value), lca({al}) {}
-    PstLine(PstSection subsection) : line_code(subsection.name), method(subsection.splits.front().method), bytes(subsection.splits.front().bytes), lca(subsection.lca) { }
+    line_code(lc), method(rm), v(v), value(value), lca{al} { lca[0] = al; }
+    PstLine(PstSection subsection) : line_code(subsection.name), method(subsection.splits.front().method), bytes(subsection.splits.front().bytes) {
+        int i = 0;
+        for (auto anlca : subsection.lca) {
+            lca[i] = anlca;
+            i++;
+        }
+    }
     PstLine(rmeth rm, int bytes, std::string value) : method(rm), bytes(bytes), value(value) {}
     PstLine(std::string lc, rmeth rm, int bytes, std::string value) : line_code(lc), method(rm), bytes(bytes), value(value) {}
     PstLine(const PstLine & pl2) = default;

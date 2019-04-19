@@ -789,7 +789,7 @@ void PstLine::read_binary_world_map(ifstream &in, boost::ptr_deque<PstLine> & fe
         if (b[i] != sea && b[i] != land) {
             // Anomoly. Add to the features vector for printing after the main map.
             features.push_back( new PstLine{line_code + "_" + to_string(i), FEATURE, b[i],
-                string() + hexchar_for_int[b[i] >> 4] + hexchar_for_int[b[i] % 16], lca.back() + "_x"});
+                string() + hexchar_for_int[b[i] >> 4] + hexchar_for_int[b[i] % 16], lca[1] + "_x"});
         }
     }
     // Now compressing the single bits of the map into hex for printing. SMAP would be all zeros, so it saves nothing.

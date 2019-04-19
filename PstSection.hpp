@@ -30,20 +30,22 @@ class PstSection {
 public:
     std::string name;
     std::list<PstSplit> splits;
-    std::list<std::string> lca = {};   // line_code_aliases
+    std::array<std::string, 3> lca;   // line_code_aliases
     
-    PstSection(std::string n, int c, int b, rmeth meth) : name(n), splits{PstSplit(meth, b, c)}, lca({n}) {};
-    PstSection(std::string n, int c, int b)             : name(n), splits{PstSplit(BULK, b, c)}, lca({n}) {};
-    PstSection(std::string n, PstSplit split)           : name(n), splits{split}, lca({n}) {};
+    PstSection(std::string n, int c, int b, rmeth meth) : name(n), splits{PstSplit(meth, b, c)}, lca{n} {};
+    PstSection(std::string n, int c, int b)             : name(n), splits{PstSplit(BULK, b, c)}, lca{n} {};
+    PstSection(std::string n, PstSplit split)           : name(n), splits{split}, lca{n} {};
     PstSection(const PstSection & parent, int c, PstSplit split)         :  splits{split} {
         std::string underscore_c = "_" + std::to_string(c);
         name = parent.name + underscore_c;
-        
-        for (auto a : parent.lca) {
-            lca.emplace_back(a + underscore_c);
-        }
-        if (lca.size() < 3) {
-            lca.emplace_back(parent.lca.back() + "_x");
+        bool didit = false;
+        for (auto i=0; i<3; i++) {
+            if (parent.lca[i].size() > 0) {
+                lca[i] = parent.lca[i] + underscore_c;
+            } else if (! didit) {
+                didit = true;
+                lca[i] = parent.lca[i-1] + "_x";
+            }
         }
     };
     void unpack(std::ifstream & in, std::ofstream & out);
