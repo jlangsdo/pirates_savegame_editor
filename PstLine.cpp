@@ -34,6 +34,10 @@ using namespace std;
 const int number_of_true_cities = 44; // Cities after this number are settlements, indian villages, Jesuit missions, or pirate bases.
 int starting_year;
 
+constexpr char hexchar_for_int[] = "0123456789abcdef";
+constexpr char hexCHAR_for_int[] = "0123456789ABCDEF";
+unsigned char int_for_hexchar[256];
+
 enum translatable : char {
     // All translatable enums should be mapped in the translation_lists
     NIL, NONE, RANK, DIFFICULTY, NATION, FLAG, SKILL, SPECIAL_MOVE, SHIP_TYPE,
@@ -52,13 +56,13 @@ enum translatable : char {
 
 // Utilities?
 int index_from_linecode (string line_code) { // Given Ship_23_1_4, returns 23
-    string line = regex_replace(line_code, regex("^[^_]+_"), "");
-    line = regex_replace(line,regex("[ _].*"), "");
-    return stoi(line);
+    auto first_underscore = line_code.find("_")+1;
+    auto second_underscore = line_code.find("_", first_underscore);
+    return stoi(line_code.substr(first_underscore, second_underscore-first_underscore));
 }
 int suffix_from_linecode (string line_code) { // Given Log_1_4, returns 4
-    string line = regex_replace(line_code, regex("^.*_"), "");
-    return stoi(line);
+    auto last_underscore = line_code.find_last_of("_")+1;
+    return stoi(line_code.substr(last_underscore, string::npos));
 }
 
 // These lists are most of the strings for 'translation' - explaining what the numerical value
@@ -636,6 +640,11 @@ void augment_decoder_groups() {
     augment_cross_translation_list(PURPOSE, PURPOSE0,  0);
     augment_cross_translation_list(PURPOSE, PURPOSE30, 30);
     augment_cross_translation_list(PURPOSE, PURPOSE40, 40);
+    
+    for (unsigned char i=0;i<16;++i) {
+        int_for_hexchar[(int)hexchar_for_int[i]] = i;
+        int_for_hexchar[(int)hexCHAR_for_int[i]] = i;
+    }
 }
 
 string translate_date(const PstLine & i) { // Translate the datestamp into a date in game time.
@@ -779,18 +788,16 @@ void PstLine::read_binary_world_map(ifstream &in, boost::ptr_deque<PstLine> & fe
         
         if (b[i] != sea && b[i] != land) {
             // Anomoly. Add to the features vector for printing after the main map.
-            stringstream ss;
-            ss << std::noshowbase << std::hex << nouppercase << setw(2) << setfill('0') << (int)(unsigned char)b[i];
-            features.push_back( new PstLine{line_code + "_" + to_string(i), FEATURE, b[i],  ss.str(), lca.back() + "_x"});
+            features.push_back( new PstLine{line_code + "_" + to_string(i), FEATURE, b[i],
+                string() + hexchar_for_int[b[i] >> 4] + hexchar_for_int[b[i] % 16], lca.back() + "_x"});
         }
     }
     // Now compressing the single bits of the map into hex for printing. SMAP would be all zeros, so it saves nothing.
     if (method != SMAP) {
-        stringstream ss;
+        value = string(bytes/4+1, '0');
         for (int j=0; j<bytes/4+1; j++) {
-            ss << std::noshowbase << std::hex << bs[j].to_ulong();
+            value[j] = hexchar_for_int[bs[j].to_ulong()];
         }
-        value = ss.str();
     }
     v = -2;    // Prevent MAP lines from being translated, even though FEATURE lines are.
 }
@@ -810,7 +817,7 @@ void PstLine::expand_map_value() {
     
     for (int b=0; b<compbytes; b++) {
         char hexchar = method==SMAP ? '0' : value[b];                               // Read one character (or assume 0 for SMAP)
-        int intval = (hexchar >= 'a') ? (hexchar - 'a' + 10) : (hexchar - '0');     // convert to decimal.
+        int intval = int_for_hexchar[hexchar];                                      // convert to int
         std::bitset<4> asbits(intval);                                              // Convert to binary
         for (int j=0; j<4; j++) {
             if (asbits[3-j]) {                        // Now for each bit of the binary, write a byte
@@ -834,8 +841,6 @@ void PstLine::read_binary(std::ifstream &in, boost::ptr_deque<PstLine> & feature
     }
 }
 
-constexpr char hexmap[] = {'0', '1', '2', '3', '4', '5', '6', '7',
-    '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
 
 void PstLine::read_binary(std::ifstream &in) {
     char b[2000] = "";
@@ -861,8 +866,8 @@ void PstLine::read_binary(std::ifstream &in) {
             // }
             value = string(bytes * 2, ' ');
             for (int i = 0; i < bytes; ++i) {
-                value[2 * i]     = hexmap[(b[i] & 0xF0) >> 4];
-                value[2 * i + 1] = hexmap[b[i] & 0x0F];
+                value[2 * i]     = hexchar_for_int[(b[i] & 0xF0) >> 4];
+                value[2 * i + 1] = hexchar_for_int[b[i] & 0x0F];
             }
            
             break;
@@ -891,7 +896,8 @@ void PstLine::read_binary(std::ifstream &in) {
                     v = (int)(char)b[i];
                 }
                 if (method == HEX) {
-                    ss << std::noshowbase << std::hex << uppercase << setw(2) << setfill('0') << (int)(unsigned char)b[i];
+                    ss << hexCHAR_for_int[(b[i] & 0xF0) >> 4];
+                    ss << hexCHAR_for_int[b[i] & 0x0F];
                     if (i != 0) { ss << ".";}
                 }
             }
@@ -944,7 +950,8 @@ void PstLine::write_binary(std::ofstream & out) {
             return;
         case HEX:   // For HEX, the byte order is reversed from the text. Also there are periods to skip.
             for (auto b=0; b<bytes; b++) {
-                out << (unsigned char)stoi(value.substr(3*(bytes-b-1),2), nullptr, 16);
+                out << (unsigned char)((int_for_hexchar[value[3*(bytes-b-1)]] << 4) + (int_for_hexchar[value[3*(bytes-b-1)+1]]));
+//                out << (unsigned char)stoi(value.substr(3*(bytes-b-1),2), nullptr, 16);
             }
             return;
         case BULK : // BULK doesn't go through vcopy. Just read the hex 2 characters at a time to write one byte.
@@ -952,7 +959,8 @@ void PstLine::write_binary(std::ofstream & out) {
         case CMAP :
         case FMAP :
             for (auto b=0; b<bytes; b++) {
-                out << (unsigned char)stoi(value.substr(2*b,2), nullptr, 16);
+                out << (unsigned char)((int_for_hexchar[value[2*b]] << 4) + (int_for_hexchar[value[2*b+1]]));
+      //          out << (unsigned char)stoi(value.substr(2*b,2), nullptr, 16);
             }
             return;
         case TEXT:
