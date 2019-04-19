@@ -31,7 +31,7 @@ public:
     void read_text(std::ifstream & i);
     void write_pg(std::ofstream & i);
     PstFile() {}
-    PstFile(std::string afile, std::string suffix=pst_suffix) {
+    explicit PstFile(std::string afile, std::string suffix=pst_suffix) {
         if (afile.length() > 0) {
             filename = find_file(afile, suffix);
             std::ifstream pst_in(filename);

@@ -684,14 +684,14 @@ void load_pirate_shipnames() {
     string aline;
     string shipclass = "";
     while(getline(data,aline)) {
-        if (regex_search(aline, regex("^#"))) {
+        if (aline[0] == '#') {
             shipclass = regex_replace(aline, regex("#"), "");
             shipnames_list[shipclass] = {};
         } else if (shipclass != "") {
             // Discard gender of ships (, M).
             // (That was in the dump from SMP because SMP supports languages other than English.)
-            string name = regex_replace(aline, regex(",.*"),"");
-            shipnames_list[shipclass].push_back(name);
+            auto comma = aline.find(",");
+            shipnames_list[shipclass].emplace_back(aline.substr(0,comma));
         }
     }
 }
