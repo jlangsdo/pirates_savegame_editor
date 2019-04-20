@@ -220,7 +220,7 @@ void pack(string afile, string out_suffix) {
     myPst.write_pg(pg_out);
 }
 
-std::vector<std::string> find_pg_files() {
+std::vector<std::string> find_pg_files() { // Used for -sweep. Returns short filenames.
     using namespace boost::filesystem;
     using namespace boost;
     vector<std::string> results;
@@ -229,17 +229,19 @@ std::vector<std::string> find_pg_files() {
         for (directory_entry& x : directory_iterator(dir_path)) {
             string afile = x.path().string();
             if (regex_search(afile, regex("." + pg_suffix + "$"))) {
-                results.push_back(afile);
+                results.push_back(afile); // x.path().filename().string());
             }
         }
     }
     return results;
 }
 
-static map<std::string, vector<std::regex> > regex_from_arg(std::vector<std::basic_string<char>, std::allocator<std::basic_string<char> > > &all_splices, int oi, unsigned long outfile_count) {
+static map<std::string, vector<std::regex> > regex_from_arg(std::string splices, int oi, unsigned long outfile_count, std::string & comment) {
     
     // This extracted routine takes a list of items as could go to -splice or -clone
     // and returns a list of regex that matches. If the outfile_count is not 1, then it parcels them out
+    
+    auto all_splices = split_by_commas(splices);
     map<std::string, vector<regex> > splice_by_section;
     if (all_splices.size() > 0) {
         for (auto i=oi % all_splices.size(); i<all_splices.size(); i += outfile_count) {
@@ -250,6 +252,7 @@ static map<std::string, vector<std::regex> > regex_from_arg(std::vector<std::bas
             string section_name = asplice.substr(0,first_underscore);
             // The line_code may be blank.
             string line_code = first_underscore == string::npos ? "" : asplice.substr(first_underscore, string::npos);
+            comment += "," + section_name + line_code;
             // The line_code may contain _x as a wildcard.
             line_code = regex_replace(line_code, regex("_x"), "_\\d+");
             // Processing the -splice string values into two regular expressions to be checked against
@@ -257,6 +260,7 @@ static map<std::string, vector<std::regex> > regex_from_arg(std::vector<std::bas
             splice_by_section[section_name].emplace_back(regex(line_code));
             splice_by_section[section_name].emplace_back(regex(line_code + "_.*"));
         }
+        comment = regex_replace(comment, regex("\\n,"), "") + "\n";
     }
     return splice_by_section;
 }
@@ -265,28 +269,32 @@ static map<std::string, vector<std::regex> > regex_from_arg(std::vector<std::bas
 void splice(std::string infile, std::string donor, std::string outfiles,
             std::string splices, std::string clone, std::string set, bool do_auto,
             std::string notfiles, std::string suffix) {
-    
+
     PstFile inPst(infile);
     auto all_outfiles = split_by_commas(outfiles);
     auto outfile_count = all_outfiles.size();
-    auto all_splices = split_by_commas(splices);
     
     // Set up source for replacement lines. Only one of these three will be active at a time (guaranteed by switch testing in main)
     PstFile donorPst(donor);
-    auto all_clones  = split_by_commas(clone);
     auto all_sets = split_by_commas(set);
     
     for (auto oi=0; oi<outfile_count; ++oi) {
         auto afile = all_outfiles[oi];
-        string outfile = save_dir + "/" + afile + "." + suffix;
+        string outfile = save_dir + "/" + afile + "." + suffix; //FIXME
+        string comment = "## Spliced\n## -in " + infile + "\n";
+        if (donor != "") { comment += "## -donor " + donor + "\n"; }
         
         // If there is just one outfile, apply all splices to it.
         // If there are multiple outfiles, parcel out the splices, but everyone gets at least one.
-        auto splice_by_section = regex_from_arg(all_splices, oi, outfile_count);
-        
+        comment += "## -splice \n";
+        auto splice_by_section = regex_from_arg(splices, oi, outfile_count, comment);
+    
         // clone can be comma-separated, so parcel out the clone regex if it exists too.
         // Doing this here because it is once per file, not once per section.
-        auto clone_by_section = regex_from_arg(all_clones, oi, outfile_count);
+        if (clone != "") { comment += "## -clone \n"; }
+        auto clone_by_section = regex_from_arg(clone, oi, outfile_count, comment);
+        
+        if (set != "") { comment += "## -set " + set + "\n"; }
         
         // Scan through the file for lines that match a section splice regex. Leave those lines out
         // (noting their sortcodes) but duplicate the rest to outPst.
@@ -364,7 +372,7 @@ void splice(std::string infile, std::string donor, std::string outfiles,
         string short_file = regex_replace(outfile, regex(".*\\/"), "");
         cout << "Writing " << short_file << "\n";
         outPst.write_pg(pg_out);
-        unpack(outfile);
+        unpack(outfile, comment);
     }
 }
 

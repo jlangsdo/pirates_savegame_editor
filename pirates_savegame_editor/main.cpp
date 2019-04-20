@@ -13,8 +13,7 @@
 #include <cstdio>
 #include "PiratesFiles.hpp"
 
-// This file handles processing the input switches and opening filehandles.
-// Other than the help messages, it knows nothing about the structure of the savegame file.
+// This file handles processing the input switches.
 
 using namespace std;
 
@@ -52,7 +51,7 @@ int main(int argc, char **argv)
     set_up_decoding();
     
     // Actually parse the options. Seems awfully redundant to have to set up the long_options and then switch through the results.
-    // But, except for -help and -advanced_help, we have to process all of the options
+    // But, except for -help and -advanced_help and save_dir, we have to process all of the options
     // before doing anything, because they come in combinations.
     
     while (1) {
@@ -92,7 +91,7 @@ int main(int argc, char **argv)
     if (unpackfiles.size()) {
         auto list = split_by_commas(unpackfiles);
         for (auto afile : list) {
-            unpack(afile);
+            unpack(afile);  // takes a short filename.
         }
     } else if (packfiles.size()) {
         auto list = split_by_commas(packfiles);
