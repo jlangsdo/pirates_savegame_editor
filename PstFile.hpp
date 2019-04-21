@@ -16,6 +16,7 @@
 #include <fstream>
 #include <iostream>
 #include <regex>
+#include <unordered_map>
 #include "PstSection.hpp"
 #include "PstLine.hpp"
 #include "PiratesFiles.hpp"

@@ -17,6 +17,7 @@
 #include <string>
 #include <vector>
 #include <regex>
+#include <set>
 #include "boost/filesystem.hpp"
 
 // Filename suffixes
@@ -134,21 +135,16 @@ void set_up_decoding() {
 }
 
 void comparePg(std::string afile) {
+    string short_file1 = afile + "." + pg_suffix;
     string file1 = find_file(afile, pg_suffix);
-    ifstream fs1 = ifstream(file1, ios::binary);   // Looks like opend()
-    if (! fs1.is_open()) {
-        cerr << "Failed to read from " << file1 << "\n";
-        exit(1);
-    }
+    ifstream fs1 = ifstream(find_file(afile, pg_suffix), ios::binary);
+    if (! fs1.is_open()) throw runtime_error("Failed to read from " + short_file1);
     
+    string short_file2 = afile + "." + test_suffix;
     string file2 = find_file(afile, test_suffix);
     ifstream fs2 = ifstream(file2, ios::binary);
-    if (! fs2.is_open()) {
-        cerr << "Failed to read from " << file2 << "\n";
-        exit(1);
-    }
-    string short_file1 = regex_replace(file1, regex(".*\\/"), "");
-    string short_file2 = regex_replace(file2, regex(".*\\/"), "");
+    if (! fs2.is_open()) throw runtime_error("Failed to read from " + short_file2);
+    
     cout << "Comparing " << short_file1 << " to " << short_file2 << "\n";
     compare_binary_filestreams(fs1,fs2); // Aborts on failure.
     fs1.close();
@@ -158,14 +154,14 @@ void comparePg(std::string afile) {
 }
 
 string find_file(string game, string suffix) {
-    // Remove suffix.
+    // Remove existing suffix.
     game = regex_replace(game, regex("\\.[^\\/]+$"), "");
     
     // Look for the game with the right suffix. It should either have
     // come with a full path, or be in the save_dir.
     const string possible_files[] = {
         game + "." + suffix,
-        save_dir + "/" + game + "." + suffix,
+        save_dir + "/" + game + "." + suffix,  // FIXME
     };
     for (auto afile : possible_files) {
         ifstream f(afile.c_str());
@@ -183,28 +179,22 @@ string find_file(string game, string suffix) {
 
 void unpack(std::string afile, std::string extra_text) {
     string pg_file = find_file(afile, pg_suffix);
+    string short_file = afile + "." + pg_suffix;
     ifstream pg_in = ifstream(pg_file, ios::binary);
-    if (! pg_in.is_open()) {
-        cerr << "Failed to read from " << pg_file << "\n";
-        exit(1);
-    }
-    string short_file = regex_replace(pg_file, regex(".*\\/"), "");
-    cout << "Translated " << short_file;
+    if (! pg_in.is_open()) throw runtime_error("Failed to read from " + pg_file);
+    
+    
     string pst_file = regex_replace(pg_file, regex(pg_suffix + "$"), pst_suffix);
+    short_file = afile + "." + pst_suffix;
     ofstream pst_out = ofstream(pst_file);
-    if (! pst_out.is_open()) {
-        cerr << "Failed to write to " << pst_file << "\n";
-        pg_in.close();
-        exit(1);
-    }
+    if (! pst_out.is_open()) throw runtime_error("Failed to write to " + pst_file);
     
     unpackPst(pg_in, pst_out); // BUG: Doesn't check that the file is eof
     pst_out << extra_text;
     pg_in.close();
     pst_out.close();
     
-    short_file = regex_replace(pst_file, regex(".*\\/"), "");
-    cout << " -> " << short_file << "\n";
+    cout << "Translated " << short_file << " -> " << short_file << "\n";
 }
 
 void testpack(string afile) {  pack(afile, test_suffix); }
@@ -229,7 +219,7 @@ std::vector<std::string> find_pg_files() { // Used for -sweep. Returns short fil
         for (directory_entry& x : directory_iterator(dir_path)) {
             string afile = x.path().string();
             if (regex_search(afile, regex("." + pg_suffix + "$"))) {
-                results.push_back(afile); // x.path().filename().string());
+                results.push_back(afile);
             }
         }
     }
@@ -238,8 +228,9 @@ std::vector<std::string> find_pg_files() { // Used for -sweep. Returns short fil
 
 static map<std::string, vector<std::regex> > regex_from_arg(std::string splices, int oi, unsigned long outfile_count, std::string & comment) {
     
-    // This extracted routine takes a list of items as could go to -splice or -clone
-    // and returns a list of regex that matches. If the outfile_count is not 1, then it parcels them out
+    // This extracted routine takes comma separated arg for -splice or -clone
+    // and returns a list of regex. If the outfile_count is not 1, it parcels them out.
+    // It also updates a comment to go at the end of the pst file describing what was done.
     
     auto all_splices = split_by_commas(splices);
     map<std::string, vector<regex> > splice_by_section;

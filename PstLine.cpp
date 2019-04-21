@@ -753,7 +753,7 @@ void PstLine::write_text(std::ofstream &out) {
 }
 
 string PstLine::mcode() {
-    return char_for_method.left.at(method) + to_string(bytes);
+    return char_for_meth[method] + to_string(bytes);
 }
 // This file includes the functions for reading one line of text according to a translation_method,
 // and returning the result as a string value (and optionally an integer value for a translated comment).
@@ -886,7 +886,7 @@ void PstLine::read_binary(std::ifstream &in) {
         case CHAR:
         case LCHAR:
         case BINARY:
-            if (bytes != standard_rmeth_size.at(method))
+            if (bytes != standard_rmeth_size[method])
                 throw logic_error("Incorrect size request for fixed size number");
             in.read((char*)&b, bytes);
             for (int i=bytes-1; i>=0; i--) {

@@ -149,7 +149,7 @@ void PstFile::read_text(std::ifstream & in) {
         auto r = special_fast_regex(line, "_ : Sd : S", "S :");
         string section   = special_fast_regex_result(line, r, 0);
         string line_code = special_fast_regex_result(line, r, 1);
-        rmeth method =   char_for_method.right.at(special_fast_regex_result(line, r, 5));
+        rmeth method =  meth_for_char(special_fast_regex_result(line, r, 5));
         int bytes   = stoi(special_fast_regex_result(line, r, 6));
         string value     = special_fast_regex_result(line, r, 10);
         

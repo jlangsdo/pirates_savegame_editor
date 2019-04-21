@@ -11,6 +11,8 @@
 
 #include <fstream>
 #include <string>
+#include <list>
+#include <array>
 #include "RMeth.hpp"
 
 void unpackPst(std::ifstream & in, std::ofstream & out);
@@ -18,7 +20,7 @@ int index_from_linecode (std::string line_code);
 
 struct PstSplit {
     rmeth method;
-    int bytes=standard_rmeth_size.at(method);
+    int bytes=standard_rmeth_size[method];
     int count=1;
     PstSplit(rmeth meth, int b, int c) : method(meth), bytes(b), count(c) {};
     PstSplit(rmeth meth, int b)        : method(meth), bytes(b)           {};

@@ -14,6 +14,7 @@
 #include <string>
 #include "RMeth.hpp"
 #include "PstSection.hpp"
+#include "boost/ptr_container/ptr_deque.hpp"
 #include <array>
 
 class PstLine {
@@ -22,7 +23,7 @@ public:
     int v;                // value reduced to a small integer for lookups
     std::string value;
     rmeth method;
-    int bytes = standard_rmeth_size.at(method);
+    int bytes = standard_rmeth_size[method];
     std::array<std::string, 3> lca;   // line_code_aliases
     
     PstLine(std::string lc, rmeth rm, int v, std::string value, std::string al) :

@@ -192,10 +192,10 @@ void PstSection::unpack (ifstream & in, ofstream & out) {
                         // For subsection_simple_decode, we have to calculate how many pieces to split it into.
                         int autocount = 1;
                         auto submeth = subsection_simple_decode.at(temp_line_code);
-                        if (standard_rmeth_size.at(submeth)>0) {
-                            autocount = split.bytes/standard_rmeth_size.at(submeth);
+                        if (standard_rmeth_size[submeth]>0) {
+                            autocount = split.bytes/standard_rmeth_size[submeth];
                         }
-                        new_splits.push_back(PstSplit{submeth, standard_rmeth_size.at(submeth), autocount});
+                        new_splits.push_back(PstSplit{submeth, standard_rmeth_size[submeth], autocount});
                     } else {
                         // For manual_decode_count, this was  done manually.
                         new_splits = subsection_manual_decode.at(temp_line_code);
