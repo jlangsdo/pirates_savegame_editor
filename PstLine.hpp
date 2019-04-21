@@ -20,7 +20,7 @@ public:
     std::string line_code;
     int v;                // value reduced to a small integer for lookups
     std::string value;
-    rmeth method;
+    rmeth method = BULK;
     int bytes = standard_rmeth_size[method];
     std::array<std::string, 3> lca;   // line_code_aliases
     
@@ -28,6 +28,7 @@ public:
     PstLine(std::string lc, rmeth rm, int v,     std::string value, std::string al) : line_code(lc), method(rm), v(v),         value(value), lca{al} { lca[0] = al; }
     PstLine(std::string lc, rmeth rm, int bytes, std::string value)                 : line_code(lc), method(rm), bytes(bytes), value(value) {}
     PstLine(const PstLine & pl2) = default;
+    PstLine() {}
     void read_binary (std::ifstream &in, std::vector<PstLine> & features);
     void read_binary_world_map (std::ifstream &in, std::vector<PstLine> & features);
     void read_binary (std::ifstream &in);

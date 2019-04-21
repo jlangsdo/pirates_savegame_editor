@@ -147,7 +147,7 @@ void PstFile::read_text(std::ifstream & in) {
         // Line order in the pst file is assumed to be scrambled.
         Sortcode sortcode = index_to_sortcode(line_code);
         
-        data[section].emplace(sortcode, std::make_unique<PstLine>(line_code, method, bytes, value) );
+        data[section].emplace(sortcode,PstLine{line_code, method, bytes, value} );
     }
     if (in.bad())
         throw runtime_error("Error while reading pst file");
@@ -160,13 +160,13 @@ void PstFile::write_pg(std::ofstream & out) {
         if (is_world_map(section.splits.front().method)) {
             // First, expand all of the non-FEATURE strings to full size.
             for (auto&& pair : data[section.name]) {
-                if (pair.second->method != FEATURE) {
-                    pair.second->expand_map_value();
+                if (pair.second.method != FEATURE) {
+                    pair.second.expand_map_value();
                 }
             }
             // Then, insert the features into the expanded maps.
             for (auto&& pair : data[section.name]) {
-                if (pair.second->method == FEATURE) {  // FeatureMap_35_202  : F1 : 10 : (Landmark)
+                if (pair.second.method == FEATURE) {  // FeatureMap_35_202  : F1 : 10 : (Landmark)
                     // pair.first = 1'032'202'000'000'000'000
                     int row = sortcode_get_index(pair.first,1);
                     int col = sortcode_get_index(pair.first,2);
@@ -176,14 +176,14 @@ void PstFile::write_pg(std::ofstream & out) {
                     // we need to edit FeatureMap_35_293 column 202, so construct the appropriate line_code, and edit that PstLine.
                     Sortcode target = index_to_sortcode("_" + to_string(row) + "_293");
                     if (data[section.name].count(target) != 1) throw logic_error ("Tried to add features to missing row");
-                    data[section.name].at(target)->update_map_value(col, pair.second->value);
+                    data[section.name].at(target).update_map_value(col, pair.second.value);
                 }
             }
         }
         
         // Now we are ready to write out the binary for the section.
         for (auto&& pair : data[section.name]) {
-            pair.second->write_binary(out);
+            pair.second.write_binary(out);
         }
     }
     out.close();

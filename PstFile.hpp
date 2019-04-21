@@ -36,13 +36,13 @@ public:
     explicit PstFile(std::string afile, std::string suffix=pst_suffix) { read_text(afile, suffix); }
     
     //     Map   of    sections ->  map of sortnum -> PstLine
-    std::unordered_map<std::string, std::map<Sortcode, std::unique_ptr<PstLine> > >  data;
+    std::unordered_map<std::string, std::map<Sortcode, PstLine> >  data;
     
     // Syntactic Sugar
-    std::map<Sortcode, std::unique_ptr<PstLine> > & operator[](const PstSection & section){ return data[section.name]; }
+    std::map<Sortcode, PstLine> & operator[](PstSection & section){ return data[section.name]; }
     bool matches(const PstSection & section, Sortcode sortcode, const std::string & value) {
-        return data[section.name].count(sortcode) != 0  &&
-        data[section.name][sortcode]->value == value;
+        return data[section.name].count(sortcode) != 0 &&
+        data[section.name][sortcode].value == value;
     }
 };
 
