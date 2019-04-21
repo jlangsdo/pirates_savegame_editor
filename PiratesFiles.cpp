@@ -375,14 +375,14 @@ void auto_splice(std::string infile, std::string donorfiles, std::string outfile
     auto outfile_count = all_outfiles.size();
     
     auto all_donorfiles = split_by_commas(donorfiles);
-    vector <std::unique_ptr<PstFile> > donorPst;
-    for (auto afile : all_donorfiles) { donorPst.emplace_back(make_unique<PstFile>(afile)); }
-    auto & oneDonor = donorPst.back();
-    //donorPst.pop_back();
+    vector <PstFile> donorPst;
+    auto oneDonor = PstFile(all_donorfiles.back());
+    all_donorfiles.pop_back();
+    for (auto afile : all_donorfiles) { donorPst.emplace_back(afile); }
     
     auto all_notfiles = split_by_commas(notfiles);
-    vector <std::unique_ptr<PstFile> > notPst;
-    for (auto afile : all_notfiles) { notPst.emplace_back(make_unique<PstFile>(afile)); }
+    vector <PstFile> notPst;
+    for (auto afile : all_notfiles) { notPst.emplace_back(afile); }
     
     // An auto-splice line comes from something observed in the donor files which is not in inPst or the notPst.
     //   - in the oneDonor, same value in other donors, different/missing in inPst and notPst
@@ -392,20 +392,20 @@ void auto_splice(std::string infile, std::string donorfiles, std::string outfile
     vector<std::string> splice_lines;
     int splice_count = 0;
     for (auto section : section_vector) {
-        for (auto && [sortcode, aPstLine] : (*oneDonor)[section]) {
+        for (auto && [sortcode, aPstLine] : (oneDonor)[section]) {
             bool splice_it = true;
             auto value = aPstLine.value;
             
             if (inPst.matches(section,sortcode,value)) { splice_it = false; }
             for (auto && otherDonor : donorPst) {
-                if (! (*otherDonor).matches(section,sortcode,value)) { splice_it = false; }
+                if (! (otherDonor).matches(section,sortcode,value)) { splice_it = false; }
             }
             for (auto && otherNot : notPst) {
-                if ((*otherNot).matches(section,sortcode,value)) { splice_it = false; }
+                if ((otherNot).matches(section,sortcode,value)) { splice_it = false; }
                 // backward compatibility: inPst must match the -not files for any line that will be spliced.
-                if ((*otherNot)[section].count(sortcode) && inPst[section].count(sortcode)) {
+                if ((otherNot)[section].count(sortcode) && inPst[section].count(sortcode)) {
                     string inVal = inPst[section][sortcode].value;
-                    if (! (*otherNot).matches(section,sortcode,inVal)) { splice_it = false; }
+                    if (! (otherNot).matches(section,sortcode,inVal)) { splice_it = false; }
                 }
             }
             if (splice_it) {
@@ -473,18 +473,18 @@ void auto_splice(std::string infile, std::string donorfiles, std::string outfile
                 if (splice_sub_lines.count(section.name) &&
                     splice_sub_lines[section.name].count(aPstLine.line_code)) {
                     // All splices must exist in the donor (see above)
-                    outPst[section].emplace(sortcode, PstLine((*oneDonor)[section][sortcode]));
+                    outPst[section].emplace(sortcode, PstLine((oneDonor)[section][sortcode]));
                 } else {
                     outPst[section].emplace(sortcode, PstLine(inPst[section][sortcode]));
                 }
             }
             // Also consider splice_targets that exist in oneDonor but not inPst.
-            for (auto && [sortcode, aPstLine] : (*oneDonor)[section]) {
+            for (auto && [sortcode, aPstLine] : (oneDonor)[section]) {
                 if ( splice_targets.count(section.name) ) {
                     if (splice_sub_lines.count(section.name) &&
                         splice_sub_lines[section.name].count(aPstLine.line_code) &&
                         ! inPst[section].count(sortcode) ) {
-                        outPst[section].emplace(sortcode, PstLine((*oneDonor)[section][sortcode]));
+                        outPst[section].emplace(sortcode, PstLine((oneDonor)[section][sortcode]));
                     }
                 }
             }
