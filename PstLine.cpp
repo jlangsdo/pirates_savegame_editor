@@ -5,16 +5,18 @@
 //  Created by Langsdorf on 4/2/19.
 //  Copyright © 2019 Langsdorf. All rights reserved.
 //
-
-// This file handles one line of the pst file - decoding the comment and translation,
-// and getting the spacing right to match the perl version of unpacking.
+// This file handles one line of the pst file.
+// It is used for creating the text to write out a pst file: decoding the comment and translation,
+//    and getting the spacing right to match the perl version of unpacking.
+// It is also used for storing data read from a pst file.
 //
-// Note that PstLine is used to pass in data (because a decode function may use .v, .value, or .line_code)
-// but the result of the many different translate_* functions is not put into the PstLine, it is returned as a string.
+// For the many translation functions, PstLine is used to pass in the input data,
+// as the translation may depend on .v, .value, .line_code
+// but the result is not put into the PstLine, it is returned as a string.
 // This is so complicated translations can be built up from different smaller translations.
 
-#include "PstLine.hpp"   // For the read_int routine, needed for starting_year.
-#include "ship_names.hpp"   // ship_names is a subset of linedecoding.
+#include "PstLine.hpp"      // For the read_int routine, needed for starting_year.
+#include "ship_names.hpp"   // ship_names is a subset of PstLine translation
 #include <stdio.h>
 #include <unordered_map>
 #include <vector>
@@ -770,7 +772,7 @@ int read_int(ifstream & in) { // Read 4 bytes from in (little endian) and conver
 }
 
 
-void PstLine::read_binary_world_map(ifstream &in, boost::ptr_deque<PstLine> & features) {
+void PstLine::read_binary_world_map(ifstream &in, std::vector<PstLine> & features) {
     unsigned char b[600];
     in.read((char*)&b, bytes);
     
@@ -788,8 +790,8 @@ void PstLine::read_binary_world_map(ifstream &in, boost::ptr_deque<PstLine> & fe
         
         if (b[i] != sea && b[i] != land) {
             // Anomoly. Add to the features vector for printing after the main map.
-            features.push_back( new PstLine{line_code + "_" + to_string(i), FEATURE, b[i],
-                string() + hexchar_for_int[b[i] >> 4] + hexchar_for_int[b[i] % 16], lca[1] + "_x"});
+            features.emplace_back(line_code + "_" + to_string(i), FEATURE, b[i],
+                string() + hexchar_for_int[b[i] >> 4] + hexchar_for_int[b[i] % 16], lca[1] + "_x");
         }
     }
     // Now compressing the single bits of the map into hex for printing. SMAP would be all zeros, so it saves nothing.
@@ -832,7 +834,7 @@ void PstLine::expand_map_value() {
     //
 }
 
-void PstLine::read_binary(std::ifstream &in, boost::ptr_deque<PstLine> & features) {
+void PstLine::read_binary(std::ifstream &in, std::vector<PstLine> & features) {
     if (is_world_map(method)) {
         this->read_binary_world_map(in, features);
         line_code += "_293";

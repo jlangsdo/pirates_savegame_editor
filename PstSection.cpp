@@ -1,5 +1,5 @@
 //
-//  SectionSplitting.cpp
+//  PstSection.cpp
 //  pirates_savegame_editor
 //
 //  Created by Langsdorf on 4/5/19.
@@ -17,7 +17,6 @@
 #include "PstSection.hpp"
 #include "PstLine.hpp"
 #include "RMeth.hpp"
-#include <boost/ptr_container/ptr_deque.hpp>
 using namespace std;
 
 
@@ -161,7 +160,7 @@ void PstSection::unpack (ifstream & in, ofstream & out) {
     // Unpack a section by printing each of the subsections that it is broken into, then any features that were collected.
     // Features are only collected from the direct child of a parent section whose rmeth is_world_map.
     int offset = 0;
-    boost::ptr_deque<PstLine> features;
+    vector<PstLine> features;
     for (auto split : splits) {  // A PstSection has a list of splits, each of which could have a count.
         for (int c=offset; c<split.count+offset;c++) {
             
@@ -184,7 +183,8 @@ void PstSection::unpack (ifstream & in, ofstream & out) {
                     auto submeth = subsection_simple_decode.at(line_code_alias);
                     if (standard_rmeth_size[submeth]>0) {
                         how_many_pieces = split.bytes/standard_rmeth_size[submeth];
-                        if (split.bytes % standard_rmeth_size[submeth]) throw logic_error ("simple split does not divide evenly.");
+                        if (split.bytes % standard_rmeth_size[submeth])
+                            throw logic_error ("simple split does not divide evenly.");
                     }
                     
                     subsection.splits = { PstSplit{submeth, standard_rmeth_size[submeth], how_many_pieces} };
