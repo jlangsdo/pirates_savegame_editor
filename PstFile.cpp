@@ -57,29 +57,8 @@ Sortcode index_to_sortcode(std::string numbers) {
     return stoull(digits.str());
 }
 
-
-Sortcode slow_index_to_sortcode(std::string numbers) {
-    // Convert a number code like _23_5_2 into a giant long integer like: 1'023'005'002'000'000'000
-    // so in the PstFile map they will sort them into place.
-    // Note that it would be illegal to have lines_codes like Ship_23 and Ship_23_0 as they would sort together.
-    stringstream digits;
-    digits << 1;
-    string original_numbers = numbers;
-    auto const digit_regex = regex("_(\\d+)");
-    smatch index;
-    
-    for (auto i=0; i<6; i++) {
-        if (std::regex_search(numbers,index,digit_regex)) {          // Strip off digits in the front
-            digits << setw(3) << setfill ('0') << index[1].str();
-            numbers = index.suffix().str();
-        } else {                                                     // Or put in zeros.
-            digits << "000";
-        }
-    }
-    return stoull(digits.str());
-}
-int sortcode_get_index(Sortcode sortcode, const int index) {
-    for (auto b=index; b<6; b++) {
+int sortcode_get_index(Sortcode sortcode, const int index) { // The sortcode is a numeric version of the linecode,
+    for (auto b=index; b<6; b++) {                           // So we can recover any piece of the linecode.
         sortcode /= 1000;
     }
     return (int) (sortcode % 1000);
@@ -137,15 +116,12 @@ std::string special_fast_regex_result(const std::string & str, const std::vector
     return str.substr(r[index],r[index+1]-r[index]);
 }
 
-//                               Section1 Number2     rmeth3  bytes4          value5    comments/translation
-auto const line_regex = regex(R"(([^_ ]+)(_\S+)\s+:\s+([^\W\d]+)(\d+)\s+:\s+(.*?)\s+:.*)");
 void PstFile::read_text(std::ifstream & in) {
     string line;
     
     while(getline(in, line)) {
-        if (line[0] == '#') { continue; } // Strip out comments.
+        if (line[0] == '#') { continue; } // Ignore comments.
         
-        // Attempting to avoid the regex above.
         auto r = special_fast_regex(line, "_ : Sd : S", "S :");
         string section   = special_fast_regex_result(line, r, 0);
         string line_code = special_fast_regex_result(line, r, 1);
@@ -154,6 +130,7 @@ void PstFile::read_text(std::ifstream & in) {
         string value     = special_fast_regex_result(line, r, 10);
         
         // Convert the line_code numbers into a big integer for quick sorting.
+        // Line order in the pst file is assumed to be scrambled.
         Sortcode sortcode = index_to_sortcode(line_code);
         
         data[section].emplace(sortcode, std::make_unique<PstLine>(line_code, method, bytes, value) );
@@ -161,36 +138,38 @@ void PstFile::read_text(std::ifstream & in) {
     if (in.bad())
         throw runtime_error("Error while reading pst file");
 }
+
 void PstFile::write_pg(std::ofstream & out) {
     for (auto section : section_vector) {
-        if (data[section.name].size() > 0 ) {
-            if (is_world_map(section.splits.front().method)) {
-                // First, inflate all of the non-FEATURE strings to full size.
-                for (auto&& pair : data[section.name]) {
-                    if (pair.second->method != FEATURE) {
-                        pair.second->expand_map_value();
-                    }
-                }
-                // Then, insert the features.
-                for (auto&& pair : data[section.name]) {
-                    if (pair.second->method == FEATURE) {  // FeatureMap_35_202  : F1 : 10 : (Landmark)
-                        // pair.first = 1'032'202'000'000'000'000
-                        int row = sortcode_get_index(pair.first,1);
-                        int col = sortcode_get_index(pair.first,2);
-                        
-                        // 293 is a magic number: the width of a map.
-                        // For a Feature at FeatureMap_35_202,
-                        // we need to edit FeatureMap_35_293 column 202, so construct the appropriate line_code, and edit that PstLine.
-                        Sortcode target = index_to_sortcode("_" + to_string(row) + "_293");
-                        if (data[section.name].count(target) != 1) throw logic_error ("Tried to add features to missing row");
-                        data[section.name].at(target)->update_map_value(col, pair.second->value);
-                    }
-                }
-            }
-            // Now we are ready to write out the binary for the section.
+        if (data[section.name].size() == 0 ) { continue; }  // Support for changing the section_vector
+        
+        if (is_world_map(section.splits.front().method)) {
+            // First, expand all of the non-FEATURE strings to full size.
             for (auto&& pair : data[section.name]) {
-                pair.second->write_binary(out);
+                if (pair.second->method != FEATURE) {
+                    pair.second->expand_map_value();
+                }
             }
+            // Then, insert the features into the expanded maps.
+            for (auto&& pair : data[section.name]) {
+                if (pair.second->method == FEATURE) {  // FeatureMap_35_202  : F1 : 10 : (Landmark)
+                    // pair.first = 1'032'202'000'000'000'000
+                    int row = sortcode_get_index(pair.first,1);
+                    int col = sortcode_get_index(pair.first,2);
+                    
+                    // 293 is a magic number: the width of a map.
+                    // For a Feature at FeatureMap_35_202,
+                    // we need to edit FeatureMap_35_293 column 202, so construct the appropriate line_code, and edit that PstLine.
+                    Sortcode target = index_to_sortcode("_" + to_string(row) + "_293");
+                    if (data[section.name].count(target) != 1) throw logic_error ("Tried to add features to missing row");
+                    data[section.name].at(target)->update_map_value(col, pair.second->value);
+                }
+            }
+        }
+        
+        // Now we are ready to write out the binary for the section.
+        for (auto&& pair : data[section.name]) {
+            pair.second->write_binary(out);
         }
     }
     out.close();

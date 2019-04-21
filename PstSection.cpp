@@ -187,7 +187,7 @@ void PstSection::unpack (ifstream & in, ofstream & out) {
                         if (split.bytes % standard_rmeth_size[submeth]) throw logic_error ("simple split does not divide evenly.");
                     }
                     
-                    subsection.splits.emplace_back(submeth, standard_rmeth_size[submeth], how_many_pieces);
+                    subsection.splits = { PstSplit{submeth, standard_rmeth_size[submeth], how_many_pieces} };
                     subsection.unpack(in, out);
                     break;  // No need to check further in the lca.
                 }
@@ -199,9 +199,7 @@ void PstSection::unpack (ifstream & in, ofstream & out) {
                     
                     // Check that the bytes for the new_splits add up.
                     int byte_count_check = 0;
-                    for (auto subinfo : new_splits) {
-                        byte_count_check += subinfo.count*subinfo.bytes;
-                    }
+                    for (auto subinfo : new_splits) { byte_count_check += subinfo.count*subinfo.bytes; }
                     if (byte_count_check != split.bytes)
                         throw logic_error("Error decoding line " + subsection.name + " subsections don't add up: " + to_string(byte_count_check) + " != " + to_string(split.bytes));
 

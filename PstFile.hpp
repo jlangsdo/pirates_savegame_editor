@@ -55,10 +55,6 @@ public:
         return data[section.name].count(sortcode) != 0  &&
         data[section.name][sortcode]->value == value;
     }
-    
-private:
-    void remove_features();
-    void apply_features();
 };
 
 
