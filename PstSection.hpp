@@ -16,7 +16,7 @@
 #include "RMeth.hpp"
 
 void unpackPst(std::ifstream & in, std::ofstream & out);
-int index_from_linecode (std::string line_code);
+int index_from_linecode (const std::string & line_code);
 
 struct PstSplit {
     rmeth method;
@@ -37,7 +37,7 @@ public:
     PstSection(std::string n, int c, int b, rmeth meth) : name(n), splits{PstSplit(meth, b, c)}, lca{n} {};
     PstSection(std::string n, int c, int b)             : name(n), splits{PstSplit(BULK, b, c)}, lca{n} {};
     PstSection(std::string n, PstSplit split)           : name(n), splits{split}, lca{n} {};
-    PstSection(const PstSection & parent, int c, PstSplit split)         :  splits{split} {
+    PstSection(const PstSection & parent, const int c, PstSplit split)         :  splits{split} {
         std::string underscore_c = "_" + std::to_string(c);
         name = parent.name + underscore_c;
         bool didit = false;

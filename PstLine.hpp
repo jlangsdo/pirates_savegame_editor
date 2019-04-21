@@ -34,7 +34,7 @@ public:
     void write_text (std::ofstream &out);
     void write_binary (std::ofstream &out);
     void expand_map_value();
-    void update_map_value(int column, std::string value);
+    void update_map_value(const int column, const std::string & value);
     std::string get_comment();
     std::string get_translation();
 };
@@ -44,16 +44,16 @@ int read_int(std::ifstream & in);
 enum translatable : char;
 
 // Public routines
-void check_for_specials(std::ifstream &in, std::ofstream &out, std::string line_code);
+void check_for_specials(std::ifstream &in, std::ofstream &out,const std::string & line_code);
 void augment_decoder_groups();
 
 // Utilities?
-int index_from_linecode (std::string);
-int suffix_from_linecode (std::string);
+int index_from_linecode  (const std::string &);
+int suffix_from_linecode (const std::string &);
 
 // Stubs for routines called by get_translation
-std::string translate(translatable t, const PstLine &);
-std::string simple_translate (translatable t, int as_int);
+std::string translate(const translatable t, const PstLine &);
+std::string simple_translate (const translatable t, const int as_int);
 std::string translate_soldiers(const PstLine &) ;
 std::string translate_acres(const PstLine &) ;
 std::string translate_luxuries_and_spices(const PstLine &) ;

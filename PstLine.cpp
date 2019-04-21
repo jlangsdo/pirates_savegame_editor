@@ -57,12 +57,12 @@ enum translatable : char {
 };
 
 // Utilities?
-int index_from_linecode (string line_code) { // Given Ship_23_1_4, returns 23
+int index_from_linecode (const std::string & line_code) { // Given Ship_23_1_4, returns 23
     auto first_underscore = line_code.find("_")+1;
     auto second_underscore = line_code.find("_", first_underscore);
     return stoi(line_code.substr(first_underscore, second_underscore-first_underscore));
 }
-int suffix_from_linecode (string line_code) { // Given Log_1_4, returns 4
+int suffix_from_linecode (const std::string & line_code) { // Given Log_1_4, returns 4
     auto last_underscore = line_code.find_last_of("_")+1;
     return stoi(line_code.substr(last_underscore, string::npos));
 }
@@ -186,9 +186,8 @@ string store_cityname (const PstLine & i) {
 }
 
 
-string simple_translate (translatable t, int as_int) {
+string simple_translate (const translatable t, const int as_int) {
     if (translation_lists.count(t)) {
-        // Simple translation from a list.
         vector<string> & list = translation_lists.at(t);
         if (as_int >= 0 && as_int < list.size()) {
             if (list.at(as_int).size() > 0) {
@@ -208,7 +207,7 @@ string simple_translate (translatable t, int as_int) {
     return "";
 }
 
-string translate(translatable t, const PstLine & i) {
+string translate(const translatable t, const PstLine & i) {
     if (t == NIL) { return ""; }
     
     string return_value = "";
@@ -684,7 +683,7 @@ string PstLine::get_comment() {
 }
 
 
-void check_for_specials(std::ifstream &in, std::ofstream &out, string line_code) {
+void check_for_specials(std::ifstream &in, std::ofstream &out,const string & line_code) {
     // The savegame file has variable length parts at the beginning and end,
     // and a huge fixed length section in the middle. Once we hit the start of the fixed length section,
     // it makes sense to peek far ahead to read the starting year, so that it can be used in all of the datestamps.
@@ -818,7 +817,7 @@ void PstLine::expand_map_value() {
     value = ss.str();
 }
 
-void PstLine::update_map_value(int column, std::string feature_value) {
+void PstLine::update_map_value(const int column, const std::string & feature_value) {
     if (! is_world_map(method))  throw logic_error("Cannot update_map_value on a non-map rmeth!");
     if (value.length() < 293*2)  throw logic_error("Cannot update_map_value before expanding map value");
     value.replace(column*2,2,feature_value);

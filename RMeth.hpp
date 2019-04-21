@@ -18,8 +18,7 @@ enum rmeth : char           {TEXT, HEX, INT, BINARY, SHORT, CHAR, LCHAR, mFLOAT,
 extern const int standard_rmeth_size[];
 extern const std::string char_for_meth[];
 
-bool constexpr is_world_map(rmeth m) {
-    // world maps get special handling.
+bool constexpr is_world_map(rmeth m) {      // world maps get special handling.
     return (m==SMAP || m==CMAP || m==FMAP);
 }
 rmeth meth_for_char(std::string chars);

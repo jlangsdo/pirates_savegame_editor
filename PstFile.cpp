@@ -116,6 +116,20 @@ std::string special_fast_regex_result(const std::string & str, const std::vector
     return str.substr(r[index],r[index+1]-r[index]);
 }
 
+void PstFile::read_text(std::string afile, std::string suffix) {
+    if (afile.length() > 0) {
+        filename = find_file(afile, suffix);
+        std::ifstream pst_in(filename);
+        if (! pst_in.is_open()) {
+            std::cerr << "Failed to read from " << filename << "\n";
+            exit(1);
+        }
+        std::string short_file = regex_replace(filename, std::regex(".*\\/"), "");
+        std::cout << "Reading " << short_file << "\n";
+        read_text(pst_in);
+        pst_in.close();
+    }
+}
 void PstFile::read_text(std::ifstream & in) {
     string line;
     
