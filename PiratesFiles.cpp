@@ -179,13 +179,13 @@ string find_file(string game, string suffix) {
 
 void unpack(std::string afile, std::string extra_text) {
     string pg_file = find_file(afile, pg_suffix);
-    string short_file = afile + "." + pg_suffix;
+    string short_file1 = afile + "." + pg_suffix;
     ifstream pg_in = ifstream(pg_file, ios::binary);
     if (! pg_in.is_open()) throw runtime_error("Failed to read from " + pg_file);
     
     
     string pst_file = regex_replace(pg_file, regex(pg_suffix + "$"), pst_suffix);
-    short_file = afile + "." + pst_suffix;
+    string short_file2 = afile + "." + pst_suffix;
     ofstream pst_out = ofstream(pst_file);
     if (! pst_out.is_open()) throw runtime_error("Failed to write to " + pst_file);
     
@@ -194,7 +194,7 @@ void unpack(std::string afile, std::string extra_text) {
     pg_in.close();
     pst_out.close();
     
-    cout << "Translated " << short_file << " -> " << short_file << "\n";
+    cout << "Translated " << short_file1 << " -> " << short_file2 << "\n";
 }
 
 void testpack(string afile) {  pack(afile, test_suffix); }
@@ -271,7 +271,6 @@ void splice(std::string infile, std::string donor, std::string outfiles,
     
     for (auto oi=0; oi<outfile_count; ++oi) {
         auto afile = all_outfiles[oi];
-        string outfile = save_dir + "/" + afile + "." + suffix; //FIXME
         string comment = "## Spliced\n## -in " + infile + "\n";
         if (donor != "") { comment += "## -donor " + donor + "\n"; }
         
@@ -358,6 +357,7 @@ void splice(std::string infile, std::string donor, std::string outfiles,
                 }
             }
         }
+        string outfile = save_dir + "/" + afile + "." + suffix; //FIXME
         ofstream pg_out(outfile);
         if (! pg_out.is_open()) throw runtime_error("Failed to write_to " + outfile);
         string short_file = regex_replace(outfile, regex(".*\\/"), "");
@@ -494,6 +494,6 @@ void auto_splice(std::string infile, std::string donorfiles, std::string outfile
         string short_file = regex_replace(outfile, regex(".*\\/"), "");
         cout << "Writing " << short_file << "\n";
         outPst.write_pg(pg_out);
-        unpack(outfile, "## Auto Spliced\n");
+        unpack(afile, "## Auto Spliced\n");
     }
 }
