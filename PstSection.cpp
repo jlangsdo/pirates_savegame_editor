@@ -171,45 +171,43 @@ void PstSection::unpack (ifstream & in, ofstream & out) {
             // The lca are line_code aliases: the Ship_0_0, Ship_x_0, Ship_x_x
             for (auto line_code_alias : subsection.lca) {
     
-                // subsection_recharacterize replaces the PstSplit with an alternate split, just for this subsection..
                 if (subsection_recharacterize.count(line_code_alias)) {
-                    subsection.splits = {subsection_recharacterize.at(line_code_alias)};
+                    subsection.splits = {subsection_recharacterize.at(line_code_alias)};  // Replace the PstSplit with an alternate split, just for this subsection..
                 }
                 
-                if (subsection_simple_decode.count(line_code_alias) ||
-                    subsection_manual_decode.count(line_code_alias) ) {
-                    
+                if (subsection_simple_decode.count(line_code_alias)) {
                     // Instead of printing this line, we split it, by calling unpack_section recursively.
                     subsection_is_actually_single_line = false;
                     
-                    list<PstSplit> new_splits;
-                    if (subsection_simple_decode.count(line_code_alias)) {
-                        // For subsection_simple_decode, we have to calculate how many pieces to split it into.
-                        int autocount = 1;
-                        auto submeth = subsection_simple_decode.at(line_code_alias);
-                        if (standard_rmeth_size[submeth]>0) {
-                            autocount = split.bytes/standard_rmeth_size[submeth];
-                        }
-                        new_splits.push_back(PstSplit{submeth, standard_rmeth_size[submeth], autocount});
-                    } else {
-                        // For manual_decode_count, this was  done manually.
-                        new_splits = subsection_manual_decode.at(line_code_alias);
+                    // For subsection_simple_decode, we have to calculate how many pieces to split it into
+                    int how_many_pieces = 1;
+                    auto submeth = subsection_simple_decode.at(line_code_alias);
+                    if (standard_rmeth_size[submeth]>0) {
+                        how_many_pieces = split.bytes/standard_rmeth_size[submeth];
+                        if (split.bytes % standard_rmeth_size[submeth]) throw logic_error ("simple split does not divide evenly.");
                     }
                     
-                    int byte_count_check = 0; // Just checking that it adds up.
+                    subsection.splits.emplace_back(submeth, standard_rmeth_size[submeth], how_many_pieces);
+                    subsection.unpack(in, out);
+                    break;  // No need to check further in the lca.
+                }
+                
+                if (subsection_manual_decode.count(line_code_alias))  {
+                    // Instead of printing this line, we split it, by calling unpack_section recursively, but the splits have been done manually.
+                    subsection_is_actually_single_line = false;
+                    auto new_splits = subsection_manual_decode.at(line_code_alias);
+                    
+                    // Check that the bytes for the new_splits add up.
+                    int byte_count_check = 0;
                     for (auto subinfo : new_splits) {
                         byte_count_check += subinfo.count*subinfo.bytes;
                     }
-                    if (byte_count_check != split.bytes) {
-                        cerr << "Error decoding line " << subsection.name << " subsections don't add up: " << byte_count_check << " != " << split.bytes << "\n";
-                        out.close();
-                        abort();
-                    }
-                    
-                    // Our subsection will now be treated as a Section, with its own new splits.
+                    if (byte_count_check != split.bytes)
+                        throw logic_error("Error decoding line " + subsection.name + " subsections don't add up: " + to_string(byte_count_check) + " != " + to_string(split.bytes));
+
                     subsection.splits = new_splits;
                     subsection.unpack(in, out);
-                    break;
+                    break; // No need to check further in the lca.
                 }
             }
             
