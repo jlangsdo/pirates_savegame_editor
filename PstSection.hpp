@@ -1,13 +1,13 @@
 //
-//  SectionSplitting.hpp
+//  PstSection.hpp
 //  pirates_savegame_editor
 //
 //  Created by Langsdorf on 4/5/19.
 //  Copyright © 2019 Langsdorf. All rights reserved.
 //
 
-#ifndef SectionSplitting_hpp
-#define SectionSplitting_hpp
+#ifndef PstSection_hpp
+#define PstSection_hpp
 
 #include <fstream>
 #include <string>
@@ -54,4 +54,4 @@ public:
 };
 extern const std::vector<PstSection> section_vector;
 
-#endif /* SectionSplitting_hpp */
+#endif /* PstSection_hpp */

@@ -7,10 +7,8 @@
 //
 
 #include "ship_names.hpp"
-#include "RMeth.hpp"
 #include <string>
 #include <sstream>
-#include <iostream>
 #include <map>
 #include <regex>
 using namespace std;
@@ -685,7 +683,7 @@ void load_pirate_shipnames() {
     string shipclass = "";
     while(getline(data,aline)) {
         if (aline[0] == '#') {
-            shipclass = regex_replace(aline, regex("#"), "");
+            shipclass = aline.substr(1);
             shipnames_list[shipclass] = {};
         } else if (shipclass != "") {
             // Discard gender of ships (, M).

@@ -10,7 +10,6 @@
 #define ship_names_hpp
 
 #include <string>
-#include "RMeth.hpp"
 #include "PstLine.hpp"
 
 void load_pirate_shipnames();

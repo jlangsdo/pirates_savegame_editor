@@ -160,10 +160,8 @@ string translate_soldiers(const PstLine & i) {
     if (i.v > 0) { return to_string(i.v*20);}
     else { return "None";}
 }
-string translate_acres(const PstLine & i) {
-    return to_string(50*i.v) + " acres";
-    
-}
+string translate_acres(const PstLine & i) { return to_string(50*i.v) + " acres"; }
+
 string translate_luxuries_and_spices(const PstLine & i) {
     int as_int = i.v/2;
     if (as_int > 49 || as_int < 0) { as_int = 49;}   // TODO: This may be mimicing a bug in the perl
@@ -174,10 +172,7 @@ string translate_pirate_hangout(const PstLine & i) {
     if (i.v == -1) { return "N/A"; }
     return simple_translate(CITYNAME, i.v);
 }
-string translate_population(const PstLine & i) {
-    return to_string( 200 * (int)(unsigned char)i.v);
-}
-
+string translate_population(const PstLine & i) {  return to_string( 200 * (int)(unsigned char)i.v); }
 string translate_following(const PstLine & i) {
     if (i.v == -2) { return "following player";}
     else { return ""; }
@@ -238,19 +233,15 @@ string translate(translatable t, const PstLine & i) {
     return return_value;
 }
 
-
-
 string store_flag(const PstLine & i){
-    string myflag = simple_translate(FLAG, i.v);
-    myflag = regex_replace(myflag, regex("[\\(\\)]"),"");
-    save_last_flag(myflag);
+    save_last_flag(simple_translate(FLAG, i.v)); // ship_names depend on the nationality of the ship.
     return "";
 }
 
 vector<int> stored_city_wealth (128);
 string translate_wealth(const PstLine & i) {
     int index = index_from_linecode(i.line_code);
-    stored_city_wealth[index] = i.v;
+    stored_city_wealth[index] = i.v;   // The wealth of the city will be needed later to describe the population
     if (i.v != 300 ) {
         return simple_translate(WEALTH_CLASS, i.v/40 );
     } else { return ""; }
@@ -287,8 +278,8 @@ string translate_event_flags(const PstLine & i) {
     return retval;
 }
 
-int stored_event;
-int subevent;
+int stored_event; // Events in the log file are spread across 8 lines
+int subevent;     // and I need a little bit of state to decode the later lines.
 int temp_i;
 string translate_event(const PstLine & i) {
     auto as_two = make_pair(i.v/16, i.v%16);
@@ -380,8 +371,8 @@ string translate_event(const PstLine & i) {
     return "";
 }
 
-string translate_city_by_linecode (const PstLine & i) { // In this case, we aren't translating the value,
-    int index = index_from_linecode(i.line_code);           // but rather noting which cityname goes with this line_code.
+string translate_city_by_linecode (const PstLine & i) {     // In this case, we aren't translating the value,
+    int index = index_from_linecode(i.line_code);           // but rather noting which cityname goes with this line_code index.
     return simple_translate(CITYNAME, index);
 }
 
@@ -422,16 +413,15 @@ string translate_beauty_and_shipwright(const PstLine & i) {
     int city_index = index_from_linecode(i.line_code);
     int city_value = (i.v+city_index)%8;
     string retval = "Shipwright can provide " + simple_translate(LONG_UPGRADES, city_value);
-    if (city_index < number_of_true_cities) { // Only main cities also have a governor's daughter.
+    if (city_index < number_of_true_cities) {   // Only main cities also have a governor's daughter.
         retval = "Daughter is " + simple_translate(BEAUTY, i.v) + ", and " + retval;
     }
     return retval;
 }
 
-// These are the list of comments and translations - explaining what a line refers to.
-// Comments depend on the line_code, not the value there; translations depend on both.
-// This map does not have to be in the order that the lines appear in the savegame file, but it makes things easier to maintain if it is.
-
+// Comments are a string that is set by the line_code.
+// translations are 'translatables' - which points to either an array of strings to look up by PstLine.v
+// or a function to calculate the translation.
 struct decode_for_line {
     std::string comment = "";
     translatable t ;
@@ -597,9 +587,9 @@ unordered_map<string,decode_for_line> line_decode = {
 
 
 void augment_from_translation_list(translatable t, string line_code, string prefix = "", string delimiter = "/") {
-    // Upgrade and Specialist lists are accessed in the translation_lists because they can appear in decodes.
+    // Upgrade and Specialist lists are accessed in the translation_lists because they can appear in decodes,
     // BUT they also appear in a binary decode where I need to see all of them in a line in reverse order.
-    // To keep the comment in sync, autogenerate it from the list.
+    // To keep the comment in sync, autogenerate the comment from the list.
     string sp = "";
     for (auto up : translation_lists.at(t)) {
         sp = delimiter + up + sp;
@@ -654,7 +644,7 @@ string translate_date(const PstLine & i) { // Translate the datestamp into a dat
     double stamp = (unsigned int)i.v;   // Leaving it negative would be more correct, but I'm matching perl here.
     if (stamp == 0 || stamp == -1) { return ""; }
     
-    // I have no idea where the 197.2 comes from; in this formula.
+    // I have no idea where the magic number 197.2 comes from.
     // I probably derived it empirically when working out the perl version
     // Perhaps it should really be 200.
     //
@@ -676,8 +666,7 @@ string translate_date(const PstLine & i) { // Translate the datestamp into a dat
 }
 
 string PstLine::get_translation() {
-    // Created lca to eliminate regex operations. We need to check Ship_1_2_3, Ship_x_2_3, and Ship_x_x_3
-    for (string lc : lca) {
+    for (string lc : lca) {  // lca = line_code_aliases.
         if (line_decode.count(lc) && line_decode.at(lc).t != NIL) {
             return translate(line_decode.at(lc).t, *this);
         }
@@ -720,7 +709,7 @@ void print_field (std::ofstream &out, string value, int default_width) {
 
 void PstLine::write_text(std::ofstream &out) {
     
-    string typecode = mcode();
+    string typecode =  char_for_meth[method] + to_string(bytes);
     string comment =  get_comment();
     string translation = get_translation();
     
@@ -754,12 +743,6 @@ void PstLine::write_text(std::ofstream &out) {
     }
 }
 
-string PstLine::mcode() {
-    return char_for_meth[method] + to_string(bytes);
-}
-// This file includes the functions for reading one line of text according to a translation_method,
-// and returning the result as a string value (and optionally an integer value for a translated comment).
-
 // Utilities?
 int read_int(ifstream & in) { // Read 4 bytes from in (little endian) and convert to integer
     char b[4];
@@ -773,6 +756,8 @@ int read_int(ifstream & in) { // Read 4 bytes from in (little endian) and conver
 
 
 void PstLine::read_binary_world_map(ifstream &in, std::vector<PstLine> & features) {
+    // Reads a line of one of the world_map types. Extracts the features (totem pole, shipwreck, etc.)
+    // and compresses the rest to make the map small enough to see in the pst file.
     unsigned char b[600];
     in.read((char*)&b, bytes);
     
@@ -789,7 +774,7 @@ void PstLine::read_binary_world_map(ifstream &in, std::vector<PstLine> & feature
         if (b[i]>max_sea) { bs.at(j)[3-k] = 1; }
         
         if (b[i] != sea && b[i] != land) {
-            // Anomoly. Add to the features vector for printing after the main map.
+            // Located a feature. Add to the features vector for printing after the main map.
             features.emplace_back(line_code + "_" + to_string(i), FEATURE, b[i],
                 string() + hexchar_for_int[b[i] >> 4] + hexchar_for_int[b[i] % 16], lca[1] + "_x");
         }
@@ -808,7 +793,7 @@ void PstLine::expand_map_value() {
     // This is the reverse of read_binary_world_map
     // Take the compressed map (where one bit indicates sea or land)
     // and expand it to a string that looks like BULK: 2 chars per byte of binary.
-        
+    // The features will be added by update_map_value()
     const string sea  = "00";
     const string land = method==CMAP ? "09" : "ff";
     stringstream ss;
@@ -831,7 +816,12 @@ void PstLine::expand_map_value() {
     }
     // Replace the compressed value in the PstLine with this expanded value.
     value = ss.str();
-    //
+}
+
+void PstLine::update_map_value(int column, std::string feature_value) {
+    if (! is_world_map(method))  throw logic_error("Cannot update_map_value on a non-map rmeth!");
+    if (value.length() < 293*2)  throw logic_error("Cannot update_map_value before expanding map value");
+    value.replace(column*2,2,feature_value);
 }
 
 void PstLine::read_binary(std::ifstream &in, std::vector<PstLine> & features) {
@@ -851,7 +841,7 @@ void PstLine::read_binary(std::ifstream &in) {
     switch (method) {
         case TEXT : // Reads the string length, then the string
             size_of_string = read_int(in);
-            if (size_of_string > sizeof(b)-2) throw logic_error("expected tring too long");
+            if (size_of_string > sizeof(b)-2) throw logic_error("expected string too long");
             in.read((char *)& b, size_of_string);
             value = b;
             if (bytes == 8) {
@@ -869,7 +859,7 @@ void PstLine::read_binary(std::ifstream &in) {
             value = string(bytes * 2, ' ');
             for (int i = 0; i < bytes; ++i) {
                 value[2 * i]     = hexchar_for_int[(b[i] & 0xF0) >> 4];
-                value[2 * i + 1] = hexchar_for_int[b[i] & 0x0F];
+                value[2 * i + 1] = hexchar_for_int[ b[i] & 0x0F];
             }
            
             break;
@@ -933,13 +923,6 @@ void PstLine::read_binary(std::ifstream &in) {
     }
 }
 
-void PstLine::update_map_value(int column, std::string feature_value) {
-    if (! is_world_map(method))  throw logic_error("Cannot update_map_value on a non-map rmeth!");
-    if (value.length() < 293*2)  throw logic_error("Cannot update_map_value before expanding map value");
-    
-    value.replace(column*2,2,feature_value);
-}
-
 void PstLine::write_binary(std::ofstream & out) {
     
     // For the numeric types, first convert to an unsigned int with a length.
@@ -953,18 +936,17 @@ void PstLine::write_binary(std::ofstream & out) {
         case HEX:   // For HEX, the byte order is reversed from the text. Also there are periods to skip.
             for (auto b=0; b<bytes; b++) {
                 out << (unsigned char)((int_for_hexchar[value[3*(bytes-b-1)]] << 4) + (int_for_hexchar[value[3*(bytes-b-1)+1]]));
-//                out << (unsigned char)stoi(value.substr(3*(bytes-b-1),2), nullptr, 16);
             }
             return;
-        case BULK : // BULK doesn't go through vcopy. Just read the hex 2 characters at a time to write one byte.
+        case BULK : // Read the hex 2 characters at a time to write one byte.
         case SMAP : // The three worldmaps have been expanded so they look like BULK.
         case CMAP :
         case FMAP :
             for (auto b=0; b<bytes; b++) {
                 out << (unsigned char)((int_for_hexchar[value[2*b]] << 4) + (int_for_hexchar[value[2*b+1]]));
-      //          out << (unsigned char)stoi(value.substr(2*b,2), nullptr, 16);
             }
             return;
+            // Cases below end with break rather than return, because they have a two part write.
         case TEXT:
             data = (unsigned int)value.length();
             bytes_to_write = 4;

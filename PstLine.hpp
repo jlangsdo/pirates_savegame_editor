@@ -9,7 +9,6 @@
 #ifndef PstLine_hpp
 #define PstLine_hpp
 
-#include <stdio.h>
 #include <vector>
 #include <string>
 #include "RMeth.hpp"
@@ -36,7 +35,6 @@ public:
     void write_binary (std::ofstream &out);
     void expand_map_value();
     void update_map_value(int column, std::string value);
-    std::string mcode();
     std::string get_comment();
     std::string get_translation();
 };
