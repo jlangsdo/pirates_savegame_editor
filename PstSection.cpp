@@ -5,8 +5,8 @@
 //  Created by Langsdorf on 4/5/19.
 //  Copyright © 2019 Langsdorf. All rights reserved.
 //
-// This file maintains the algorithms and data for splitting up a section into
-// individual lines that can be read and translated, to unpack the savegame file.
+// This file maintains the algorithms and data for splitting up a PstFile into PstSection(s),
+// and ultimately into individual PstLine(s) that can be read and translated, to unpack the savegame file.
 
 #include <unordered_map>
 #include <vector>
@@ -21,14 +21,14 @@
 using namespace std;
 
 
-// Main description of contents and size of each section, in order.
-//    sections with single letter names are generally not understood.
+// Main description of contents and size of each section. This sets the expected order in the pg file.
+// Sections with single letter names are placeholders for data that I do not understand.
 //
-// Sections will then be broken up further and further, recurvively. There are two key rules
+// Sections will then be broken up further and further, recurvively, in a way that is extensible. There are two key rules
 //   1. Dewey Decimal Rule: (DDR) You can break up a section into subsections, as long as their bytes add up to that of the parent.
-//                          This allows more translation of bytes within a subsection without renumbering any other sections.
+//                          This allows more detailed translation of bytes within a subsection without renumbering any other sections.
 //   2. Backward Compatible: The pst gives enough information to restore the pirates_savegame file,
-//                           even if the decoding arrays below have changed.
+//                           even if the decoding methods have changed. The only thing needed is the order of sections.
 //
 
 const vector<PstSection> section_vector = {
@@ -114,12 +114,9 @@ unordered_map<string,PstSplit> subsection_recharacterize = {
     {"t_0",           {BULK,8,1}},   // 16 != 8. This is accounted for by having the starting size of t be 8 too large.
 };
 
-// This map lets you split up a section into multiple sections that may be of different or variable types and sizes.
-// Make sure the bytes add up to the size of the original section (this is checked at runtime....
-// however, if you split a section into only ONE item, then it will permit you to change the size
-// (temporarily breaking the Dewey Decimal Rule). Make sure to account for it elsewhere.)
-//    Syntax is {rmeth, bytes, count }
-// If only one item appears in the list, then the size is auto-calculated???
+// This map lets you split up a section into multiple subsections that may be of different or variable types and sizes.
+// Make sure the bytes add up to the size of the original section (this is checked at runtime)
+//    PstSplit syntax is {rmeth, bytes, count }
 // The zero length zero string for Ship_x_4_5 happened because two adjacent shorts were switched
 // for an INT and a ZERO. This manuever is required by DDR, to avoid renumbering later pieces
 // (Ship_x_4_7 numbering remained unchanged)
@@ -164,41 +161,39 @@ void PstSection::unpack (ifstream & in, ofstream & out) {
     // Unpack a section by printing each of the subsections that it is broken into, then any features that were collected.
     // Features are only collected from the direct child of a parent section whose rmeth is_world_map.
     int offset = 0;
-    for (auto split : splits) {
-        boost::ptr_deque<PstLine> features;
-        
+    boost::ptr_deque<PstLine> features;
+    for (auto split : splits) {  // A PstSection has a list of splits, each of which could have a count.
         for (int c=offset; c<split.count+offset;c++) {
             
             PstSection subsection{*this, c, split};
             bool subsection_is_actually_single_line = true;  // We'll find out.
             
-            // This while loop progressively changes the indices in the subsection to _x, to look it up in the maps.
-            string temp_line_code = subsection.name;
-            for (auto temp_line_code : subsection.lca) {
+            // The lca are line_code aliases: the Ship_0_0, Ship_x_0, Ship_x_x
+            for (auto line_code_alias : subsection.lca) {
     
                 // subsection_recharacterize replaces the PstSplit with an alternate split, just for this subsection..
-                if (subsection_recharacterize.count(temp_line_code)) {
-                    subsection.splits = {subsection_recharacterize.at(temp_line_code)};
+                if (subsection_recharacterize.count(line_code_alias)) {
+                    subsection.splits = {subsection_recharacterize.at(line_code_alias)};
                 }
                 
-                if (subsection_simple_decode.count(temp_line_code) ||
-                    subsection_manual_decode.count(temp_line_code) ) {
+                if (subsection_simple_decode.count(line_code_alias) ||
+                    subsection_manual_decode.count(line_code_alias) ) {
                     
                     // Instead of printing this line, we split it, by calling unpack_section recursively.
                     subsection_is_actually_single_line = false;
                     
                     list<PstSplit> new_splits;
-                    if (subsection_simple_decode.count(temp_line_code)) {
+                    if (subsection_simple_decode.count(line_code_alias)) {
                         // For subsection_simple_decode, we have to calculate how many pieces to split it into.
                         int autocount = 1;
-                        auto submeth = subsection_simple_decode.at(temp_line_code);
+                        auto submeth = subsection_simple_decode.at(line_code_alias);
                         if (standard_rmeth_size[submeth]>0) {
                             autocount = split.bytes/standard_rmeth_size[submeth];
                         }
                         new_splits.push_back(PstSplit{submeth, standard_rmeth_size[submeth], autocount});
                     } else {
                         // For manual_decode_count, this was  done manually.
-                        new_splits = subsection_manual_decode.at(temp_line_code);
+                        new_splits = subsection_manual_decode.at(line_code_alias);
                     }
                     
                     int byte_count_check = 0; // Just checking that it adds up.
@@ -225,14 +220,10 @@ void PstSection::unpack (ifstream & in, ofstream & out) {
             }
         }
         offset += split.count;
-        
-        // world_map sections accumulate features, which we print after the map.
-        if (is_world_map(split.method)) {
-            for (auto feature : features) {
-                feature.write_text(out);
-            }
-            features.release();   // I think this deletes all of the PstLine objects created in read_world_map.
-        }
+    }
+    // world_map sections accumulate features, which we print after the map.
+    for (auto feature : features) {
+        feature.write_text(out);
     }
 }
 
