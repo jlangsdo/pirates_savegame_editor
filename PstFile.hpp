@@ -29,12 +29,13 @@ Sortcode index_to_sortcode(std::string numbers);
 class PstFile {
 public:
     std::string filename;
-    void read_text(std::ifstream & i);
-    void read_text(std::string afile, std::string suffix);
-    void write_pg(std::ofstream & i);
-    PstFile() {}
-    explicit PstFile(std::string afile, std::string suffix=pst_suffix) { read_text(afile, suffix); }
     
+    void read_pst(std::string afile, std::string suffix);
+    void write_pg(std::string suffix=pg_suffix);
+    
+    PstFile() {}
+    explicit PstFile(std::string afile, std::string suffix=pst_suffix) { read_pst(afile, suffix); }
+    void set_filename(std::string afile, std::string suffix) { filename = find_file(afile, suffix); }
     //     Map   of    sections ->  map of sortnum -> PstLine
     std::unordered_map<std::string, std::map<Sortcode, PstLine> >  data;
     

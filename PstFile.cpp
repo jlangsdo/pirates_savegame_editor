@@ -6,7 +6,7 @@
 //  Copyright © 2019 Langsdorf. All rights reserved.
 //
 // A PstFile corresponds to the full data from a pst file read in from text,
-// with each line read corresponding to one PstLine.
+// with each line read corresponding to one PstLine, and can write out to a pg file.
 
 #include "PstFile.hpp"
 #include "PstSection.hpp"
@@ -116,24 +116,18 @@ std::string special_fast_regex_result(const std::string & str, const std::vector
     return str.substr(r[index],r[index+1]-r[index]);
 }
 
-void PstFile::read_text(std::string afile, std::string suffix) {
-    if (afile.length() > 0) {
-        filename = find_file(afile, suffix);
-        std::ifstream pst_in(filename);
-        if (! pst_in.is_open()) {
-            std::cerr << "Failed to read from " << filename << "\n";
-            exit(1);
-        }
-        std::string short_file = regex_replace(filename, std::regex(".*\\/"), "");
-        std::cout << "Reading " << short_file << "\n";
-        read_text(pst_in);
-        pst_in.close();
+void PstFile::read_pst(std::string afile, std::string suffix) {
+    filename = find_file(afile, suffix);
+    auto instream = std::ifstream (filename);
+    if (! instream.is_open()) {
+        std::cerr << "Failed to read from " << filename << "\n";
+        exit(1);
     }
-}
-void PstFile::read_text(std::ifstream & in) {
-    string line;
+    std::string short_file = regex_replace(filename, std::regex(".*\\/"), "");
+    std::cout << "Reading " << short_file << "\n";
     
-    while(getline(in, line)) {
+    string line;
+    while(getline(instream, line)) {
         if (line[0] == '#') { continue; } // Ignore comments.
         
         auto r = special_fast_regex(line, "_ : Sd : S", "S :");
@@ -149,11 +143,16 @@ void PstFile::read_text(std::ifstream & in) {
         
         data[section].emplace(sortcode,PstLine{line_code, method, bytes, value} );
     }
-    if (in.bad())
-        throw runtime_error("Error while reading pst file");
+    instream.close();
 }
 
-void PstFile::write_pg(std::ofstream & out) {
+void PstFile::write_pg(std::string suffix) {
+    string pg_file    = regex_replace(filename, regex(pst_suffix + "$"), suffix);
+    string short_file = regex_replace(pg_file, regex(".*\\/"), "");
+    auto outstream = ofstream(pg_file);
+    if (! outstream.is_open()) throw runtime_error("Failed to write_to " + pg_file);
+    cout << "Writing " << short_file << "\n";
+    
     for (auto section : section_vector) {
         if (data[section.name].size() == 0 ) { continue; }  // Support for changing the section_vector
         
@@ -183,8 +182,8 @@ void PstFile::write_pg(std::ofstream & out) {
         
         // Now we are ready to write out the binary for the section.
         for (auto&& pair : data[section.name]) {
-            pair.second.write_binary(out);
+            pair.second.write_binary(outstream);
         }
     }
-    out.close();
+    outstream.close();
 }

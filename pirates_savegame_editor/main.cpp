@@ -17,7 +17,7 @@
 
 using namespace std;
 
-string save_dir;  // global var to avoid passing it to every routine in PiratesFiles.
+string save_dir;  // global var to avoid passing it to every read/write routine in PiratesFiles.
 
 int main(int argc, char **argv)
 {    int c;
@@ -49,6 +49,11 @@ int main(int argc, char **argv)
     
     // Get the pirates module ready to go.
     set_up_decoding();
+    
+    // Setting the default pirates savegame dir.
+    string env_user = "USER_NOT_DEFINED";
+    if(const char* env_p = std::getenv("USER")) { env_user = env_p; }
+    save_dir = "/Users/" + env_user + "/Library/Preferences/Firaxis Games/Sid Meier's Pirates!/My Games/Game";
     
     // Actually parse the options. Seems awfully redundant to have to set up the long_options and then switch through the results.
     // But, except for -help and -advanced_help and save_dir, we have to process all of the options
@@ -116,7 +121,7 @@ int main(int argc, char **argv)
         if (donorfiles != "" && setregex != "")   throw invalid_argument("Do not use -donor and -set together");
         if (donorfiles != "" && cloneregex != "") throw invalid_argument("Do not use -donor and -clone together");
         if (cloneregex != "" && setregex != "")   throw invalid_argument("Do not use -clone and -set together");
-        splice(infile, donorfiles, outfiles, spliceregex, cloneregex, setregex, do_auto, notfiles);
+        splice(infile, donorfiles, outfiles, spliceregex, cloneregex, setregex, notfiles);
     } else if (infile != "" && outfiles != "" && donorfiles !="" && do_auto) {
         auto_splice(infile, donorfiles, outfiles, notfiles);
     } else {

@@ -4,8 +4,7 @@
 //
 //  Created by Langsdorf on 4/10/19.
 //
-// This module has the file handling routines so the calls in main() can be as straightforward as possible.
-
+// This module implements the algorithsm called for in main: pack/unpack/test/sweep/splice/auto
 
 #include "PiratesFiles.hpp"
 #include "PstFile.hpp"
@@ -137,7 +136,7 @@ void set_up_decoding() {
 void comparePg(std::string afile) {
     string short_file1 = afile + "." + pg_suffix;
     string file1 = find_file(afile, pg_suffix);
-    ifstream fs1 = ifstream(find_file(afile, pg_suffix), ios::binary);
+    ifstream fs1 = ifstream(file1, ios::binary);
     if (! fs1.is_open()) throw runtime_error("Failed to read from " + short_file1);
     
     string short_file2 = afile + "." + test_suffix;
@@ -189,9 +188,13 @@ void unpack(std::string afile, std::string extra_text) {
     ofstream pst_out = ofstream(pst_file);
     if (! pst_out.is_open()) throw runtime_error("Failed to write to " + pst_file);
     
-    unpackPst(pg_in, pst_out); // BUG: Doesn't check that the file is eof
-    pst_out << extra_text;
+    unpackPst(pg_in, pst_out);
+    pg_in.ignore(1);    // A little paranoia here. unpackPst reads only what it wants,
+    if (!pg_in.eof())   // I wanted to cover the case where there are extra bits in the pg file.
+        throw runtime_error("Found extra bits still in " + pg_file);
     pg_in.close();
+    
+    pst_out << extra_text;
     pst_out.close();
     
     cout << "Translated " << short_file1 << " -> " << short_file2 << "\n";
@@ -199,15 +202,10 @@ void unpack(std::string afile, std::string extra_text) {
 
 void testpack(string afile) {  pack(afile, test_suffix); }
 void pack(string afile)     {  pack(afile, pg_suffix); }
+
 void pack(string afile, string out_suffix) {
     PstFile myPst(afile, pst_suffix);
-    string pg_file = regex_replace(myPst.filename, regex(pst_suffix + "$"), out_suffix);
-    string short_file = regex_replace(pg_file, regex(".*\\/"), "");
-    ofstream pg_out = ofstream(pg_file);
-    if (! pg_out.is_open()) throw runtime_error("Failed to write_to " + pg_file);
-    cout << "Writing " << short_file << "\n";
-    
-    myPst.write_pg(pg_out);
+    myPst.write_pg(out_suffix);
 }
 
 std::vector<std::string> find_pg_files() { // Used for -sweep. Returns short filenames.
@@ -258,8 +256,7 @@ static map<std::string, vector<std::regex> > regex_from_arg(std::string splices,
 
 
 void splice(std::string infile, std::string donor, std::string outfiles,
-            std::string splices, std::string clone, std::string set, bool do_auto,
-            std::string notfiles, std::string suffix) {
+            std::string splices, std::string clone, std::string set, std::string notfiles) {
 
     PstFile inPst(infile);
     auto all_outfiles = split_by_commas(outfiles);
@@ -357,13 +354,10 @@ void splice(std::string infile, std::string donor, std::string outfiles,
                 }
             }
         }
-        string outfile = save_dir + "/" + afile + "." + suffix; //FIXME
-        ofstream pg_out(outfile);
-        if (! pg_out.is_open()) throw runtime_error("Failed to write_to " + outfile);
-        string short_file = regex_replace(outfile, regex(".*\\/"), "");
-        cout << "Writing " << short_file << "\n";
-        outPst.write_pg(pg_out);
-        unpack(outfile, comment);
+        outPst.set_filename(afile, pg_suffix);
+        outPst.write_pg();
+        
+        unpack(outPst.filename, comment);
     }
 }
 
@@ -375,9 +369,9 @@ void auto_splice(std::string infile, std::string donorfiles, std::string outfile
     auto outfile_count = all_outfiles.size();
     
     auto all_donorfiles = split_by_commas(donorfiles);
-    vector <PstFile> donorPst;
     auto oneDonor = PstFile(all_donorfiles.back());
     all_donorfiles.pop_back();
+    vector<PstFile> donorPst;
     for (auto afile : all_donorfiles) { donorPst.emplace_back(afile); }
     
     auto all_notfiles = split_by_commas(notfiles);
@@ -422,7 +416,6 @@ void auto_splice(std::string infile, std::string donorfiles, std::string outfile
     // in all donors. Also, no need for regex, we have exact sortcodes / linecodes.
     for (auto oi=0; oi<outfile_count; ++oi) {
         auto afile = all_outfiles[oi];
-        string outfile = save_dir + "/" + afile + "." + pg_suffix;
         
         enum auto_mode {ALL, ONE, HALF};
         auto_mode mode;
@@ -489,11 +482,10 @@ void auto_splice(std::string infile, std::string donorfiles, std::string outfile
                 }
             }
         }
-        ofstream pg_out(outfile);
-        if (! pg_out.is_open()) throw runtime_error("Failed to write_to " + outfile);
-        string short_file = regex_replace(outfile, regex(".*\\/"), "");
-        cout << "Writing " << short_file << "\n";
-        outPst.write_pg(pg_out);
+        
+        outPst.set_filename(afile, pg_suffix);
+        outPst.write_pg();
+        
         unpack(afile, "## Auto Spliced\n");
     }
 }
