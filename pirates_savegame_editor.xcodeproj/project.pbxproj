@@ -12,6 +12,7 @@
 		155D5630225ED95C00B1B0CB /* PiratesFiles.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 155D562F225ED95C00B1B0CB /* PiratesFiles.cpp */; };
 		155D5632225ED98300B1B0CB /* RMeth.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 155D5631225ED98300B1B0CB /* RMeth.cpp */; };
 		156371F522581CC000EB4167 /* PstSection.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 156371F322581CC000EB4167 /* PstSection.cpp */; };
+		156D568B22944BD1007855C0 /* PGetoptLong.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 156D568A22944BD1007855C0 /* PGetoptLong.cpp */; };
 		15874C5722526BD60046F95F /* ship_names.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 15874C5522526BD60046F95F /* ship_names.cpp */; };
 		1599E751225BE4E400EEB2C6 /* PstFile.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1599E74F225BE4E400EEB2C6 /* PstFile.cpp */; };
 /* End PBXBuildFile section */
@@ -38,6 +39,8 @@
 		155D5631225ED98300B1B0CB /* RMeth.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = RMeth.cpp; path = /Users/langsdorf/Documents/c/pirates_savegame_editor/pirates_savegame_editor/RMeth.cpp; sourceTree = "<absolute>"; };
 		156371F322581CC000EB4167 /* PstSection.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = PstSection.cpp; sourceTree = "<group>"; };
 		156371F422581CC000EB4167 /* PstSection.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = PstSection.hpp; sourceTree = "<group>"; };
+		156D568A22944BD1007855C0 /* PGetoptLong.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = PGetoptLong.cpp; sourceTree = "<group>"; };
+		156D568C22944BD7007855C0 /* PGetoptLong.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = PGetoptLong.hpp; sourceTree = "<group>"; };
 		15874C5522526BD60046F95F /* ship_names.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ship_names.cpp; sourceTree = "<group>"; };
 		15874C5622526BD60046F95F /* ship_names.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = ship_names.hpp; sourceTree = "<group>"; };
 		158A9BE9224F95210062534D /* RMeth.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = RMeth.hpp; sourceTree = "<group>"; };
@@ -61,6 +64,8 @@
 			children = (
 				153F2B98224EC78E00CCA927 /* pirates_savegame_editor */,
 				153F2B97224EC78E00CCA927 /* Products */,
+				156D568A22944BD1007855C0 /* PGetoptLong.cpp */,
+				156D568C22944BD7007855C0 /* PGetoptLong.hpp */,
 				155D562F225ED95C00B1B0CB /* PiratesFiles.cpp */,
 				155D562E225EAB7F00B1B0CB /* PiratesFiles.hpp */,
 				155D5631225ED98300B1B0CB /* RMeth.cpp */,
@@ -151,6 +156,7 @@
 				156371F522581CC000EB4167 /* PstSection.cpp in Sources */,
 				153F2B9A224EC78E00CCA927 /* main.cpp in Sources */,
 				155D5630225ED95C00B1B0CB /* PiratesFiles.cpp in Sources */,
+				156D568B22944BD1007855C0 /* PGetoptLong.cpp in Sources */,
 				1599E751225BE4E400EEB2C6 /* PstFile.cpp in Sources */,
 				15472B2C2253EDBD00858D2F /* PstLine.cpp in Sources */,
 				15874C5722526BD60046F95F /* ship_names.cpp in Sources */,
